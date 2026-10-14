@@ -23,6 +23,25 @@ const cleanJSON = (text) => {
     return JSON.parse(match ? match[0] : unmarkdown);
 };
 
+// Calculate adaptive time limit based on skill and IELTS band
+const calculateQuestTime = (skill, band) => {
+    const numBand = parseFloat(band) || 5.0;
+    if (skill === 'writing') {
+        if (numBand <= 5.0) return 60;
+        if (numBand <= 6.5) return 75;
+        return 90;
+    }
+    if (skill === 'speaking') {
+        if (numBand <= 5.0) return 40;
+        if (numBand <= 6.5) return 50;
+        return 60;
+    }
+    // Reading & Listening
+    if (numBand <= 5.0) return 35;
+    if (numBand <= 6.5) return 45;
+    return 55;
+};
+
 // Comprehensive task pool for all skills (English interface & strict format)
 const TASK_POOL = {
     reading: [
@@ -56,15 +75,15 @@ const TASK_POOL = {
     writing: [
         {
             type: 'REBUTTAL_WRITING',
-            instruction: 'Rebuttal Challenge: "context" is an extreme statement (10-15 words). "prompt" is: "Write 1 sentence rebutting this using Although, However, or While."'
+            instruction: 'IELTS Task 1 Report Paraphrase: "context" is an IELTS Task 1 introductory statement (e.g. "The line graph illustrates the proportion of households owning cars in the UK from 1990 to 2010."). "prompt" MUST be: "Paraphrase this Task 1 introduction in 1 sentence using academic synonyms and varied grammar."'
         },
         {
             type: 'REBUTTAL_WRITING',
-            instruction: 'Paraphrase Challenge: "context" is a basic Band 5.0 sentence (10-15 words). "prompt" is: "Rewrite this sentence using advanced academic vocabulary or compound structure."'
+            instruction: 'IELTS Task 2 Rebuttal: "context" is a controversial statement (12-18 words, e.g. "Some believe government should ban all private vehicles in metropolitan city centers."). "prompt" MUST be: "Write 1 concession + rebuttal sentence using \'Although\' or \'While\' addressing this statement."'
         },
         {
             type: 'REBUTTAL_WRITING',
-            instruction: 'Sentence Fix: "context" is a sentence with 1 obvious grammatical error. "prompt" is: "Rewrite the sentence with the grammatical error corrected."'
+            instruction: 'IELTS Sentence Elevation: "context" is a choppy Band 5.0 sentence with repetitive vocabulary (12-16 words). "prompt" MUST be: "Rewrite this sentence combining clauses and using Band 7+ academic vocabulary."'
         }
     ],
     speaking: [
@@ -81,8 +100,9 @@ app.post('/api/generate-quest', async (req, res) => {
         const { skill = 'reading', band = '4.0' } = req.body;
         const skillTasks = TASK_POOL[skill] || TASK_POOL.reading;
         const chosenTask = skillTasks[Math.floor(Math.random() * skillTasks.length)];
+        const targetTime = calculateQuestTime(skill, band);
 
-        const prompt = `You are an elite IELTS Dungeon Master designing a bite-sized RPG challenge.
+        const prompt = `You are The Oracle, Master of the IELTS Dungeon, designing a bite-sized RPG challenge.
 Target Skill: "${skill}"
 UI Type: "${chosenTask.type}"
 Target IELTS Band Difficulty: "${band}" (Scale: 4.0 to 8.0)
@@ -98,12 +118,12 @@ STRICT MICRO-LEARNING RULES:
 - "monster": Cool fantasy RPG monster name in English (2-3 words, e.g. "Shadow Drake", "Abyssal Viper", "Obsidian Sphinx", "Frost Golem").
 - "avatar": 1 matching emoji.
 - "context": Maximum 35 words. For Listening, this is the spoken script to be read aloud.
-- "prompt": Maximum 20 words. CRITICAL: If the task is Gap-fill or Note Completion, "prompt" MUST include the target sentence with a blank slot marked as "[...]".
+- "prompt": Clear and unambiguous. CRITICAL: If the task is Gap-fill or Note Completion, "prompt" MUST include the target sentence with a blank slot marked as "[...]".
 - "options": Array of 3 choices (or ["TRUE", "FALSE", "NOT GIVEN"]).
 - "answer": Array of valid correct lowercase answers (e.g. ["circulation", "flow"]).
 - "explanation": Maximum 15 words in English explaining the concept/vocabulary (e.g. "'depart' means to leave").
 - "hint": Under 8 words in English (a guiding clue, DO NOT include the actual answer word).
-- "time": 40
+- "time": ${targetTime}
 
 Return ONLY raw JSON (no markdown \`\`\`json):
 {
@@ -118,7 +138,7 @@ Return ONLY raw JSON (no markdown \`\`\`json):
     "answer": ["answer1", "synonym2"],
     "explanation": "...",
     "hint": "...",
-    "time": 40
+    "time": ${targetTime}
 }`;
 
         const response = await ai.models.generateContent({
@@ -130,6 +150,7 @@ Return ONLY raw JSON (no markdown \`\`\`json):
         });
 
         const quest = cleanJSON(response.text);
+        if (!quest.time) quest.time = targetTime;
         res.json({ success: true, quest });
     } catch (error) {
         console.error('Quest generation error:', error);
@@ -141,7 +162,7 @@ Return ONLY raw JSON (no markdown \`\`\`json):
 app.post('/api/evaluate-writing', async (req, res) => {
     try {
         const { userText, context, prompt: questPrompt, band = '4.0' } = req.body;
-        const prompt = `You are a friendly IELTS Examiner grading a micro-writing challenge.
+        const prompt = `You are The Oracle's IELTS Examiner grading a micro-writing challenge.
 Target Band: "${band}"
 Original Context: "${context}"
 Task Prompt: "${questPrompt || ''}"

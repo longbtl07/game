@@ -228,6 +228,7 @@
             max-height: 160px;
             overflow-y: auto;
             border-radius: 0 4px 4px 0;
+            transition: all 0.3s ease;
         }
         .quest-desc {
             font-size: 15px;
@@ -405,14 +406,14 @@
             <div id="monster-avatar" class="monster-avatar">🗿</div>
             <div id="monster-name" class="monster-name">Obsidian Sphinx</div>
             <div id="monster-meta" style="font-size: 13px; color: #8a99ad; margin-top: 4px;">Floor 1 • Band 4.0</div>
-            <div class="timer-display" id="timer-box">⏳ 40s</div>
+            <div class="timer-display" id="timer-box">⏳ 35s</div>
         </div>
 
         <div class="quest-box">
             <div>
                 <span id="quest-badge" class="badge-type">LOADING...</span>
                 <div id="quest-context-container"></div>
-                <div class="quest-desc" id="quest-prompt">Connecting to Oracle AI...</div>
+                <div class="quest-desc" id="quest-prompt">Connecting to The Oracle...</div>
                 <div id="quest-input-container"></div>
             </div>
             <div class="action-row" id="quest-actions"></div>
@@ -430,11 +431,14 @@ const API_BASE_URL = window.location.protocol === 'file:'
     ? 'https://game-3qxq.onrender.com/api' 
     : '/api';
 
+// Lock flag preventing multiple submissions or Enter spamming
+let isActionLocked = false;
+
 // ==========================================
 // 1. AI SERVER COMMUNICATION
 // ==========================================
 async function callAI_GenerateQuest(skill) {
-    log("🔮 Oracle AI is bending dimensions to summon a quest...");
+    log("🔮 The Oracle is bending dimensions to summon a quest...");
     const currentBand = BAND_THRESHOLDS[currentBandIndex].band;
     
     try {
@@ -453,7 +457,7 @@ async function callAI_GenerateQuest(skill) {
         }
     } catch (error) {
         console.error("AI Generation Error:", error);
-        log("⚠️ Oracle crystal disrupted. Engaging emergency backup challenge!");
+        log("⚠️ The Oracle crystal disrupted. Engaging emergency backup challenge!");
         
         return {
             skill: skill,
@@ -461,16 +465,20 @@ async function callAI_GenerateQuest(skill) {
             type: skill === 'writing' ? "REBUTTAL_WRITING" : (skill === 'speaking' ? "SPEAKING_PROMPT" : "SHORT_ANSWER"),
             monster: "Disconnection Phantom",
             avatar: "📡",
-            context: skill === 'speaking' ? "Vocabulary cues: [benefit, disadvantage, perspective]" : "Online education is becoming widespread. It allows students to study at their own pace.",
+            context: skill === 'speaking' 
+                ? "Vocabulary cues: [benefit, disadvantage, perspective]" 
+                : (skill === 'writing' 
+                    ? "The chart illustrates the percentage of university graduates finding employment within six months in 2022."
+                    : "Online education is becoming widespread. It allows students to study at their own pace."),
             prompt: skill === 'writing' 
-                ? "Rebut: 'Online classes are completely ineffective for young learners.'"
+                ? "Paraphrase this Task 1 introduction in 1 sentence using academic synonyms and varied grammar."
                 : (skill === 'speaking' 
                     ? "Do you prefer studying online or in person? Why?" 
                     : "Complete summary: Online learning enables students to set their own [...]. (1 WORD ONLY)"),
-            answer: skill === 'writing' ? ["although", "however", "while"] : ["pace", "speed", "schedule"],
+            answer: skill === 'writing' ? ["illustrates", "depicts", "reveals", "shows"] : ["pace", "speed", "schedule"],
             explanation: "'at their own pace' means setting one's personal schedule.",
             hint: "Look for words related to rhythm or speed.",
-            time: 40
+            time: skill === 'writing' ? 65 : 40
         };
     }
 }
@@ -495,7 +503,7 @@ async function callAI_EvaluateWriting(userText, questContext, questPrompt) {
         console.error("AI Evaluation Error:", error);
         return { 
             isPassed: false, 
-            feedback: "AI Examiner server unreachable. Attack missed!", 
+            feedback: "The Oracle Examiner connection lost. Attack missed!", 
             damage: 20 
         };
     }
@@ -516,7 +524,7 @@ const RAW_DATABASE = [
         answer: ["circulation", "flow"],
         explanation: "'improves blood circulation' refers to blood circulation.",
         hint: "Look for a medical term starting with 'c'.",
-        time: 40
+        time: 35
     },
     {
         skill: "listening",
@@ -528,7 +536,7 @@ const RAW_DATABASE = [
         prompt: "Note: The train to London leaves at [...] from platform four. (1 WORD/NUMBER)",
         answer: ["10:15", "10:15 am", "10.15"],
         explanation: "'depart at 10:15 AM' indicates the scheduled departure time.",
-        hint: "Listen specifically for the time announced.",
+        hint: "Listen specifically for the departure time.",
         time: 35
     },
     {
@@ -537,12 +545,12 @@ const RAW_DATABASE = [
         type: "REBUTTAL_WRITING",
         monster: "Logic Gargoyle",
         avatar: "🗿",
-        context: "Fast food is always healthy and never causes obesity.",
-        prompt: "Write 1 sentence rebutting this statement using Although or However.",
-        answer: ["although", "however", "while"],
-        explanation: "Use contrasting conjunctions with correct grammar.",
-        hint: "Start with 'Although fast food...'",
-        time: 45
+        context: "The line graph illustrates the percentage of households with Internet access in France from 2000 to 2010.",
+        prompt: "Paraphrase this Task 1 introduction in 1 sentence using academic synonyms and varied grammar.",
+        answer: ["depicts", "shows", "proportion", "households", "internet"],
+        explanation: "Good Task 1 paraphrases use words like 'depicts', 'proportion', 'dwellings'.",
+        hint: "Replace 'illustrates' with 'depicts' or 'shows'.",
+        time: 60
     },
     {
         skill: "speaking",
@@ -555,7 +563,7 @@ const RAW_DATABASE = [
         answer: ["hobby", "enjoy", "relax"],
         explanation: "Speak fluently for at least 8-10 words.",
         hint: "Mention your hobby and reason clearly.",
-        time: 45
+        time: 40
     }
 ];
 
@@ -582,6 +590,14 @@ function levenshtein(a, b) {
         }
     }
     return matrix[a.length][b.length];
+}
+
+// Fallback adaptive time if quest.time is missing
+function getAdaptiveTime(skill, band) {
+    const num = parseFloat(band) || 5.0;
+    if (skill === 'writing') return num <= 5.0 ? 60 : (num <= 6.5 ? 75 : 90);
+    if (skill === 'speaking') return num <= 5.0 ? 40 : (num <= 6.5 ? 50 : 60);
+    return num <= 5.0 ? 35 : (num <= 6.5 ? 45 : 55);
 }
 
 // ==========================================
@@ -630,7 +646,7 @@ const SKILL_PROGRESS = {
         pool: [],
         questIndex: 0,
         currentQuest: null,
-        timeLeft: 40,
+        timeLeft: 35,
         userInput: '',
         isWon: false,
         lastLog: ''
@@ -640,7 +656,7 @@ const SKILL_PROGRESS = {
         pool: [],
         questIndex: 0,
         currentQuest: null,
-        timeLeft: 40,
+        timeLeft: 35,
         userInput: '',
         isWon: false,
         lastLog: ''
@@ -650,7 +666,7 @@ const SKILL_PROGRESS = {
         pool: [],
         questIndex: 0,
         currentQuest: null,
-        timeLeft: 45,
+        timeLeft: 60,
         userInput: '',
         isWon: false,
         lastLog: ''
@@ -660,7 +676,7 @@ const SKILL_PROGRESS = {
         pool: [],
         questIndex: 0,
         currentQuest: null,
-        timeLeft: 45,
+        timeLeft: 40,
         userInput: '',
         isWon: false,
         lastLog: ''
@@ -672,7 +688,7 @@ let currentQuest = null;
 let playerHP = 100;
 let maxHP = 100;
 let timerInterval = null;
-let timeLeft = 40;
+let timeLeft = 35;
 const LOOT_POOL = ["Collocation Card", "Paraphrase Scroll", "Inversion Armor", "Lexical Resource Elixir"];
 
 async function selectSkill(newSkill) {
@@ -690,6 +706,7 @@ async function selectSkill(newSkill) {
     }
 
     currentSkill = newSkill;
+    isActionLocked = false;
 
     // Highlight active nav tab
     document.querySelectorAll('.hub-nav .hub-btn').forEach(btn => {
@@ -701,7 +718,7 @@ async function selectSkill(newSkill) {
     // 2. If this skill ALREADY has a quest in progress, seamlessly restore it!
     if (prog.currentQuest !== null) {
         currentQuest = prog.currentQuest;
-        timeLeft = prog.timeLeft || currentQuest.time || 40;
+        timeLeft = prog.timeLeft || currentQuest.time || getAdaptiveTime(newSkill, currentQuest.band);
         
         renderQuestDisplay(currentQuest, prog.floor, prog.isWon, prog.userInput);
         if (prog.lastLog) {
@@ -729,7 +746,6 @@ async function selectSkill(newSkill) {
 
 function formatPromptWithBlanks(promptText) {
     if (!promptText) return '';
-    // Replace [...] or [BLANK] or [blank] with styled glowing blank slot
     return promptText.replace(/\[\.\.\.\]|\[BLANK\]|\[blank\]/g, '<span class="blank-slot">[ &nbsp;...&nbsp; ]</span>');
 }
 
@@ -754,7 +770,17 @@ function renderQuestDisplay(q, floor, isWon, savedInput) {
 
     const ctxContainer = document.getElementById('quest-context-container');
     if (q.skill === 'listening') {
-        ctxContainer.innerHTML = `<div class="passage-text" style="font-style: italic; color: #8a99ad; text-align: center;">🔒 (Listening: Script hidden. Play Audio to listen)</div>`;
+        if (isWon) {
+            // Reveal full script if monster has already been defeated!
+            ctxContainer.innerHTML = `
+                <div class="passage-text" style="border-left-color: var(--hp-green); background: #0c1020;">
+                    <div style="font-family: var(--font-game); font-size: 12px; color: var(--gold); margin-bottom: 6px;">📜 AUDIO TRANSCRIPT:</div>
+                    <span style="color: #fff; line-height: 1.6;">${q.context}</span>
+                </div>
+            `;
+        } else {
+            ctxContainer.innerHTML = `<div class="passage-text" style="font-style: italic; color: #8a99ad; text-align: center;">🔒 (Listening: Script hidden. Play Audio to listen)</div>`;
+        }
     } else if (q.context) {
         ctxContainer.innerHTML = `<div class="passage-text">${q.context}</div>`;
     } else {
@@ -773,14 +799,20 @@ function renderQuestDisplay(q, floor, isWon, savedInput) {
         if (inp) inp.value = savedInput;
     }
 
-    // If already won on this floor, keep the Next Floor button active
+    // If already won on this floor, keep Next Floor button active and lock input
     if (isWon) {
+        isActionLocked = true;
+        const inp = document.getElementById('text-answer-input');
+        if (inp) inp.disabled = true;
         document.getElementById('quest-actions').innerHTML = `<button class="game-btn btn-next" onclick="nextQuestAsync()">NEXT FLOOR ➔</button>`;
+    } else {
+        isActionLocked = false;
     }
 }
 
 async function loadCurrentQuest() {
     clearInterval(timerInterval);
+    isActionLocked = true;
     document.querySelectorAll('.hub-btn, #quest-actions .game-btn').forEach(b => b.disabled = true);
     
     const prog = SKILL_PROGRESS[currentSkill];
@@ -792,7 +824,10 @@ async function loadCurrentQuest() {
     currentQuest = prog.pool[prog.questIndex];
     prog.currentQuest = currentQuest;
     prog.floor++;
-    prog.timeLeft = currentQuest.time || 40;
+
+    // Adaptive flexible time limit based on Band and Skill
+    const baseTime = currentQuest.time || getAdaptiveTime(currentSkill, currentQuest.band);
+    prog.timeLeft = prog.floor % 10 === 0 ? baseTime + 20 : baseTime; // Boss floor bonus
     prog.userInput = '';
     prog.isWon = false;
     timeLeft = prog.timeLeft;
@@ -802,6 +837,7 @@ async function loadCurrentQuest() {
     document.querySelectorAll('.hub-btn').forEach(b => b.disabled = false);
     updateTimerUI();
     startTimer();
+    isActionLocked = false;
     log(`⚔️ Floor ${prog.floor}: ${currentQuest.monster} appeared!`);
 }
 
@@ -824,7 +860,7 @@ function renderInputForQuest(q) {
         `;
     }
     else if (q.type === 'SHORT_ANSWER') {
-        inputContainer.innerHTML = `<input type="text" id="text-answer-input" class="quest-input" placeholder="Enter your answer (Press Enter to submit)..." onkeydown="if(event.key==='Enter') checkAnswerAsync()">`;
+        inputContainer.innerHTML = `<input type="text" id="text-answer-input" class="quest-input" placeholder="Enter your answer (Press Enter to submit)..." onkeydown="if(event.key==='Enter'&&!event.repeat){event.preventDefault();checkAnswerAsync();}">`;
         actionsContainer.innerHTML = `
             <button class="game-btn btn-submit" onclick="checkAnswerAsync()">ATTACK (SUBMIT)</button>
             ${q.skill === 'listening' ? '<button class="game-btn btn-audio" id="btn-audio-player" onclick="playAudioWhisper()">🔊 AUDIO</button>' : '<button class="game-btn btn-hint" onclick="sacrificeHPHint()">HINT (-15 HP)</button>'}
@@ -855,9 +891,14 @@ function renderInputForQuest(q) {
 // ANSWER EVALUATION (ASYNC)
 // ==========================================
 async function checkAnswerAsync() {
+    // Prevent multiple submissions or spam clicking Enter
+    if (isActionLocked || (SKILL_PROGRESS[currentSkill] && SKILL_PROGRESS[currentSkill].isWon)) {
+        return;
+    }
+
     let userAns = '';
+    const inputEl = document.getElementById('text-answer-input');
     if (currentQuest.type === 'SHORT_ANSWER') {
-        const inputEl = document.getElementById('text-answer-input');
         if (!inputEl) return;
         userAns = inputEl.value.trim().toLowerCase();
         if (!userAns) return log('⚠️ Please enter an answer!');
@@ -886,23 +927,34 @@ async function checkAnswerAsync() {
     });
 
     if (isCorrect) {
+        // Lock action immediately to prevent double submissions or Enter spam
+        isActionLocked = true;
+        if (inputEl) inputEl.disabled = true;
+        const submitBtn = document.querySelector('.btn-submit');
+        if (submitBtn) submitBtn.disabled = true;
         triggerVictory();
     } else {
-        // Pedagogy: NEVER leak the explanation/answer while the student is still alive and trying!
+        // Attack missed: Do NOT leak answer! Provide gentle clue
         takeDamage(25, 'Attack missed! Incorrect answer.', null, currentQuest.hint);
     }
 }
 
 async function handleWritingAsync() {
-    const text = document.getElementById('text-answer-input').value.trim();
+    if (isActionLocked || (SKILL_PROGRESS[currentSkill] && SKILL_PROGRESS[currentSkill].isWon)) {
+        return;
+    }
+
+    const textInput = document.getElementById('text-answer-input');
+    const text = textInput ? textInput.value.trim() : '';
     if (text.length < 8) return log('⚠️ Sentence is too short!');
 
     const btn = document.getElementById('btn-write');
     btn.disabled = true;
-    btn.innerText = "SUBMITTING TO AI EXAMINER...";
+    btn.innerText = "SUBMITTING TO THE ORACLE...";
     clearInterval(timerInterval);
+    isActionLocked = true;
 
-    log("👁️ AI Examiner is evaluating grammar and logic...");
+    log("👁️ The Oracle Examiner is evaluating grammar and logic...");
     
     let result = await callAI_EvaluateWriting(text, currentQuest.context, currentQuest.prompt);
 
@@ -915,6 +967,7 @@ async function handleWritingAsync() {
             triggerVictory(result.feedback);
         }, 1200);
     } else {
+        isActionLocked = false;
         takeDamage(result.damage || 30, 'Rebuttal Failed!', null, result.feedback);
         if (playerHP > 0) {
             btn.disabled = false;
@@ -1089,7 +1142,22 @@ function takeDamage(amt, reason, explanation = null, clue = null) {
 
     if (playerHP <= 0) {
         clearInterval(timerInterval);
+        isActionLocked = true;
         if (isRecording && recognitionInstance) recognitionInstance.stop();
+
+        // Reveal script for listening upon defeat
+        if (currentQuest.skill === 'listening' && currentQuest.context) {
+            const ctxContainer = document.getElementById('quest-context-container');
+            if (ctxContainer) {
+                ctxContainer.innerHTML = `
+                    <div class="passage-text" style="border-left-color: var(--hp-red); background: #0c1020;">
+                        <div style="font-family: var(--font-game); font-size: 12px; color: var(--gold); margin-bottom: 6px;">📜 AUDIO TRANSCRIPT:</div>
+                        <span style="color: #fff; line-height: 1.6;">${currentQuest.context}</span>
+                    </div>
+                `;
+            }
+        }
+
         setTimeout(() => { 
             const overlay = document.getElementById('game-over-overlay');
             const restartBtn = document.getElementById('btn-restart');
@@ -1105,6 +1173,7 @@ function triggerVictory(customMsg) {
     
     const prog = SKILL_PROGRESS[currentSkill];
     prog.isWon = true;
+    isActionLocked = true;
 
     // Gradual EXP gain: +15 EXP normally, +25 on boss floors
     const expGain = prog.floor % 10 === 0 ? 25 : 15;
@@ -1123,10 +1192,24 @@ function triggerVictory(customMsg) {
     log(victoryLog);
     prog.lastLog = victoryLog;
 
+    // Reveal Listening transcript when enemy is defeated!
+    if (currentQuest.skill === 'listening' && currentQuest.context) {
+        const ctxContainer = document.getElementById('quest-context-container');
+        if (ctxContainer) {
+            ctxContainer.innerHTML = `
+                <div class="passage-text" style="border-left-color: var(--hp-green); background: #0c1020;">
+                    <div style="font-family: var(--font-game); font-size: 12px; color: var(--gold); margin-bottom: 6px;">📜 AUDIO TRANSCRIPT:</div>
+                    <span style="color: #fff; line-height: 1.6;">${currentQuest.context}</span>
+                </div>
+            `;
+        }
+    }
+
     document.getElementById('quest-actions').innerHTML = `<button class="game-btn btn-next" onclick="nextQuestAsync()">NEXT FLOOR ➔</button>`;
 }
 
 async function nextQuestAsync() {
+    isActionLocked = false;
     const prog = SKILL_PROGRESS[currentSkill];
     prog.questIndex++;
     prog.isWon = false;
@@ -1149,8 +1232,23 @@ function startTimer() {
         updateTimerUI();
         if (timeLeft <= 0) {
             clearInterval(timerInterval);
+            isActionLocked = true;
             const ansStr = Array.isArray(currentQuest.answer) ? currentQuest.answer[0] : currentQuest.answer;
             takeDamage(30, 'TIME OUT! The monster strikes!', `Correct answer: "${ansStr}". ${currentQuest.explanation || ''}`);
+            
+            // Reveal transcript for listening on timeout
+            if (currentQuest.skill === 'listening' && currentQuest.context) {
+                const ctxContainer = document.getElementById('quest-context-container');
+                if (ctxContainer) {
+                    ctxContainer.innerHTML = `
+                        <div class="passage-text" style="border-left-color: var(--hp-red); background: #0c1020;">
+                            <div style="font-family: var(--font-game); font-size: 12px; color: var(--gold); margin-bottom: 6px;">📜 AUDIO TRANSCRIPT:</div>
+                            <span style="color: #fff; line-height: 1.6;">${currentQuest.context}</span>
+                        </div>
+                    `;
+                }
+            }
+
             if (playerHP > 0) nextQuestAsync();
         }
     }, 1000);
@@ -1164,6 +1262,7 @@ function restartGame() {
     playerHP = maxHP;
     playerEXP = 0;
     currentBandIndex = 0;
+    isActionLocked = false;
     
     // Reset all skill states
     for (const s in SKILL_PROGRESS) {
@@ -1171,7 +1270,7 @@ function restartGame() {
         SKILL_PROGRESS[s].pool = [];
         SKILL_PROGRESS[s].questIndex = 0;
         SKILL_PROGRESS[s].currentQuest = null;
-        SKILL_PROGRESS[s].timeLeft = 40;
+        SKILL_PROGRESS[s].timeLeft = 35;
         SKILL_PROGRESS[s].userInput = '';
         SKILL_PROGRESS[s].isWon = false;
         SKILL_PROGRESS[s].lastLog = '';
