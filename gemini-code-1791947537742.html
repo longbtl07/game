@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Avalon IELTS RPG: Infinite AI Dungeon</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,500;0,700;1,700&family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0b0d17;
+            --panel-bg: #141729;
+            --border-color: #3b4269;
+            --hp-green: #2ecc71;
+            --hp-red: #e74c3c;
+            --gold: #f1c40f;
+            --accent: #9b59b6;
+            --text-color: #e2e8f0;
+            --font-game: 'Chakra Petch', sans-serif;
+            --font-body: 'Be Vietnam Pro', sans-serif;
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-body);
+            display: flex;
+            justify-content: center;
+        }
+
+        #game-container {
+            width: 950px;
+            background: var(--panel-bg);
+            border: 3px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.85);
+            overflow: hidden;
+            position: relative;
+        }
+
+        header {
+            background: #0f1120;
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--border-color);
+            font-family: var(--font-game);
+            font-size: 15px;
+            letter-spacing: 0.5px;
+        }
+
+        .hp-bar-wrap {
+            width: 200px;
+            background: #2c3e50;
+            height: 18px;
+            border: 2px solid #fff;
+            border-radius: 4px;
+            overflow: hidden;
+            display: inline-block;
+            vertical-align: middle;
+            margin-left: 8px;
+        }
+        .hp-bar {
+            width: 100%;
+            height: 100%;
+            background: var(--hp-green);
+            transition: width 0.3s ease, background-color 0.3s;
+        }
+
+        .hub-nav {
+            display: flex;
+            background: #101324;
+            border-bottom: 2px solid var(--border-color);
+        }
+        .hub-btn {
+            flex: 1;
+            padding: 14px;
+            background: transparent;
+            border: none;
+            color: #8a99ad;
+            font-family: var(--font-game);
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-right: 1px solid var(--border-color);
+            text-transform: uppercase;
+        }
+        .hub-btn:hover, .hub-btn.active {
+            background: #1e223d;
+            color: var(--gold);
+        }
+        .hub-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .arena {
+            padding: 24px;
+            display: grid;
+            grid-template-columns: 290px 1fr;
+            gap: 24px;
+            min-height: 480px;
+        }
+
+        .monster-view {
+            background: #0c0e1a;
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 18px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        .monster-avatar {
+            font-size: 75px;
+            margin-bottom: 12px;
+            filter: drop-shadow(0 0 12px rgba(255,255,255,0.25));
+            animation: bounce 2s infinite alternate ease-in-out;
+            transition: transform 0.3s;
+        }
+        @keyframes bounce {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-10px); }
+        }
+        .monster-name {
+            font-family: var(--font-game);
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--gold);
+            margin-bottom: 6px;
+            transition: color 0.3s;
+        }
+        .timer-display {
+            font-family: var(--font-game);
+            font-size: 18px;
+            font-weight: 700;
+            color: #e67e22;
+            margin-top: 15px;
+        }
+
+        .quest-box {
+            background: #111322;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .badge-type {
+            display: inline-block;
+            font-family: var(--font-game);
+            font-size: 11px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: var(--accent);
+            color: #fff;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        .passage-text {
+            background: #080911;
+            padding: 14px;
+            border-left: 4px solid var(--accent);
+            font-size: 14px;
+            line-height: 1.65;
+            margin-bottom: 16px;
+            max-height: 160px;
+            overflow-y: auto;
+            border-radius: 0 4px 4px 0;
+        }
+        .quest-desc {
+            font-size: 15px;
+            line-height: 1.6;
+            margin-bottom: 14px;
+        }
+
+        .option-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 14px;
+            margin-bottom: 8px;
+            background: #181c30;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        .option-item:hover { border-color: var(--gold); }
+        .option-item input { margin-right: 12px; cursor: pointer; }
+
+        .quest-input {
+            width: 100%;
+            background: #090a14;
+            border: 2px solid var(--border-color);
+            color: #fff;
+            padding: 12px;
+            border-radius: 6px;
+            font-family: var(--font-body);
+            font-size: 15px;
+            margin-bottom: 12px;
+        }
+        .quest-input:focus { outline: none; border-color: var(--gold); }
+
+        .action-row {
+            display: flex;
+            gap: 12px;
+            margin-top: 15px;
+        }
+        .game-btn {
+            padding: 12px 20px;
+            font-family: var(--font-game);
+            font-size: 13px;
+            font-weight: 700;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+            text-transform: uppercase;
+        }
+        .game-btn:active { transform: scale(0.97); }
+        .game-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        
+        .btn-submit { background: var(--hp-green); color: #000; }
+        .btn-hint { background: var(--hp-red); color: #fff; }
+        .btn-audio { background: #3498db; color: #fff; }
+        .btn-next { background: var(--gold); color: #000; margin-left: auto; }
+
+        /* Overlays */
+        #objection-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(214, 48, 49, 0.94);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+        .objection-text {
+            font-family: var(--font-game);
+            font-size: 60px;
+            font-weight: 800;
+            color: #fff;
+            text-shadow: 4px 4px 0px #000;
+            animation: zoomShake 0.4s ease-out;
+        }
+        @keyframes zoomShake {
+            0% { transform: scale(0.2) rotate(-8deg); }
+            70% { transform: scale(1.15) rotate(4deg); }
+            100% { transform: scale(1) rotate(0deg); }
+        }
+
+        #game-over-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 17, 32, 0.95);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+        }
+        .game-over-text {
+            font-family: var(--font-game);
+            font-size: 70px;
+            font-weight: 800;
+            color: var(--hp-red);
+            text-shadow: 4px 4px 0px #000;
+            animation: zoomFade 0.5s ease-out;
+            letter-spacing: 5px;
+        }
+        @keyframes zoomFade {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .battle-log {
+            padding: 12px 24px;
+            background: #080912;
+            border-top: 2px solid var(--border-color);
+            font-size: 14px;
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            color: var(--gold);
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="objection-overlay">
+        <div class="objection-text">OBJECTION!</div>
+        <p id="objection-sub" style="font-size: 18px; color: white; margin-top: 15px; font-weight: 600; padding: 0 20px; text-align: center;"></p>
+    </div>
+
+    <div id="game-over-overlay">
+        <div class="game-over-text">DEFEATED</div>
+        <button class="game-btn btn-submit" style="margin-top: 20px; font-size: 16px;" onclick="restartGame()">HỒI SINH (Restart)</button>
+    </div>
+
+    <header>
+        <div id="player-band" style="color: var(--gold); font-weight: bold; font-size: 16px;">
+            BAND 6.0 <span style="font-size: 12px; color: #8a99ad;">(EXP: 0 / 100)</span>
+        </div>
+        <div>
+            HP: 
+            <div class="hp-bar-wrap">
+                <div id="player-hp" class="hp-bar"></div>
+            </div>
+            <span id="hp-num" style="margin-left: 8px;">100/100</span>
+        </div>
+    </header>
+
+    <div class="hub-nav">
+        <button class="hub-btn active" onclick="selectSkill('reading')">1. READING</button>
+        <button class="hub-btn" onclick="selectSkill('listening')">2. LISTENING</button>
+        <button class="hub-btn" onclick="selectSkill('writing')">3. WRITING</button>
+        <button class="hub-btn" onclick="selectSkill('speaking')">4. SPEAKING</button>
+    </div>
+
+    <div class="arena">
+        <div class="monster-view">
+            <div id="monster-avatar" class="monster-avatar">🗿</div>
+            <div id="monster-name" class="monster-name">Thạch Nhân Sphinx</div>
+            <div id="monster-meta" style="font-size: 13px; color: #8a99ad; margin-top: 4px;">Tầng 1 • Vực Sâu</div>
+            <div class="timer-display" id="timer-box">⏳ 45s</div>
+        </div>
+
+        <div class="quest-box">
+            <div>
+                <span id="quest-badge" class="badge-type">ĐANG TẢI...</span>
+                <div id="quest-context-container"></div>
+                <div class="quest-desc" id="quest-prompt">Đang kết nối tới Oracle AI...</div>
+                <div id="quest-input-container"></div>
+            </div>
+            <div class="action-row" id="quest-actions"></div>
+        </div>
+    </div>
+
+    <div class="battle-log" id="battle-log">⚔️ Chào mừng học sĩ đã bước vào hầm ngục ngôn ngữ Avalon!</div>
+</div>
+
+<script>
+// ==========================================
+// CẤU HÌNH API TỰ ĐỘNG (CHẠY ĐƯỢC CẢ LOCAL LẪN RENDER)
+// ==========================================
+const API_BASE_URL = window.location.protocol === 'file:' 
+    ? 'https://game-3qxq.onrender.com/api' 
+    : '/api';
+
+// ==========================================
+// 1. GIAO TIẾP VỚI SERVER AI (FETCH API)
+// ==========================================
+async function callAI_GenerateQuest(skill) {
+    log("🔮 Oracle AI đang bẻ cong không gian để sinh đề...");
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/generate-quest`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ skill: skill })
+        });
+        
+        const data = await response.json();
+        const questData = data.quest || data.data;
+        if (data.success && questData) {
+            return questData;
+        } else {
+            throw new Error("Dữ liệu trả về bị lỗi hoặc rỗng");
+        }
+    } catch (error) {
+        console.error("AI Generation Error:", error);
+        log("⚠️ Mạng tinh thể Oracle bị nhiễu. Sử dụng dữ liệu dự phòng!");
+        
+        return {
+            skill: skill,
+            type: skill === 'writing' ? "REBUTTAL_WRITING" : (skill === 'speaking' ? "SPEAKING_PROMPT" : "SHORT_ANSWER"),
+            monster: "Bóng Ma Mất Kết Nối",
+            avatar: "📡",
+            context: skill === 'speaking' ? "Sử dụng Micro." : "Due to a network anomaly, you are facing a manual challenge. Answer the prompt.",
+            prompt: skill === 'writing' ? "Phản bác: 'Technology is completely useless in education'." : (skill === 'speaking' ? "Do you think technology helps students learn better? Why?" : "What is a common synonym of 'vital'? (ONE WORD)"),
+            answer: skill === 'writing' ? ["although", "however"] : ["important", "crucial", "essential", "necessary"],
+            explanation: "Dữ liệu offline do mất kết nối server AI.",
+            hint: "Đáp án có thể là 'important', 'crucial' hoặc dùng 'however'.",
+            time: 45
+        };
+    }
+}
+
+async function callAI_EvaluateWriting(userText, questContext, questPrompt) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/evaluate-writing`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userText: userText, context: questContext, prompt: questPrompt })
+        });
+        
+        const data = await response.json();
+        const evalData = data.evaluation || data.data;
+        if (data.success && evalData) {
+            return evalData;
+        } else {
+            throw new Error("Server trả về trạng thái lỗi");
+        }
+    } catch (error) {
+        console.error("AI Evaluation Error:", error);
+        return { 
+            isPassed: false, 
+            feedback: "Server AI giám khảo mất kết nối. Đòn đánh trượt!", 
+            damage: 20 
+        };
+    }
+}
+
+// ==========================================
+// KHO DỮ LIỆU TĨNH KHỞI TẠO (ĐÃ BỔ SUNG ĐỦ OPTIONS)
+// ==========================================
+const RAW_DATABASE = [
+    {
+        skill: "reading",
+        type: "TRUE_FALSE_NOT_GIVEN",
+        monster: "Băng Thần Nemean",
+        avatar: "🐻‍❄️",
+        context: "Polar bears are increasingly threatened. Humans with comparative levels of adipose tissue would be obese and suffer from diabetes. Yet the polar bear experiences no such consequences.",
+        prompt: "Polar bears suffer from various health problems due to the build-up of fat.",
+        options: ["TRUE", "FALSE", "NOT GIVEN"],
+        answer: ["FALSE", "F", "NO"],
+        explanation: "Đoạn văn khẳng định 'Yet the polar bear experiences no such consequences'.",
+        hint: "Gấu bắc cực không bị bệnh.",
+        time: 40
+    },
+    {
+        skill: "listening",
+        type: "SHORT_ANSWER",
+        monster: "Mộc Tinh Sirena",
+        avatar: "🧚",
+        context: "One of the regular activities is trying to keep the beach free of litter.",
+        prompt: "Making sure the beach does not have [BLANK] on it.",
+        answer: ["litter", "trash", "rubbish", "garbage"],
+        explanation: "'Free of litter' = does not have litter.",
+        hint: "Từ vựng chỉ rác thải",
+        time: 35
+    }
+];
+
+// ==========================================
+// THUẬT TOÁN TIỆN ÍCH
+// ==========================================
+function fisherYatesShuffle(array) {
+    const arr = [...array];
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+}
+
+function levenshtein(a, b) {
+    const matrix = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0));
+    for (let i = 0; i <= a.length; i++) matrix[i][0] = i;
+    for (let j = 0; j <= b.length; j++) matrix[0][j] = j;
+    for (let i = 1; i <= a.length; i++) {
+        for (let j = 1; j <= b.length; j++) {
+            const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+            matrix[i][j] = Math.min(matrix[i - 1][j] + 1, matrix[i][j - 1] + 1, matrix[i - 1][j - 1] + cost);
+        }
+    }
+    return matrix[a.length][b.length];
+}
+
+// ==========================================
+// HỆ THỐNG LEVEL & EXP (PROGRESSION)
+// ==========================================
+const BAND_THRESHOLDS = [
+    { band: "6.0", exp: 0 }, { band: "6.5", exp: 100 }, { band: "7.0", exp: 250 },
+    { band: "7.5", exp: 450 }, { band: "8.0", exp: 700 }, { band: "8.5", exp: 1000 }, { band: "9.0", exp: 1500 }
+];
+
+let playerEXP = 0;
+let currentBandIndex = 0;
+
+function updateBandUI() {
+    let nextTier = BAND_THRESHOLDS[currentBandIndex + 1];
+    let targetExp = nextTier ? nextTier.exp : "MAX";
+    let currentBand = BAND_THRESHOLDS[currentBandIndex].band;
+    document.getElementById('player-band').innerHTML = `BAND ${currentBand} <span style="font-size:12px; color:#8a99ad;">(EXP: ${playerEXP} / ${targetExp})</span>`;
+}
+
+function gainEXP(amount) {
+    playerEXP += amount;
+    let nextTier = BAND_THRESHOLDS[currentBandIndex + 1];
+    if (nextTier && playerEXP >= nextTier.exp) {
+        currentBandIndex++;
+        log(`🎉 LEVEL UP! BẠN ĐÃ ĐẠT BAND ${nextTier.band}! Sức mạnh học thuật tăng vọt!`);
+        playerHP = Math.min(maxHP, playerHP + 20);
+        updateHPBar();
+    }
+    updateBandUI();
+}
+
+// ==========================================
+// TRẠNG THÁI GAME & VÒNG LẶP GIAO DIỆN
+// ==========================================
+let currentSkill = 'reading';
+let activePool = [];
+let currentQuestIndex = 0;
+let currentQuest = null;
+let playerHP = 100;
+let maxHP = 100;
+let timerInterval = null;
+let timeLeft = 45;
+let floorLevel = 0;
+const LOOT_POOL = ["Thẻ Bài Collocation", "Bí kíp Paraphrase", "Mảnh Giáp Inversion", "Nước Thần Lexical Resource"];
+
+async function selectSkill(skill) {
+    if (isRecording && recognitionInstance) recognitionInstance.stop();
+    currentSkill = skill;
+    document.querySelectorAll('.hub-nav .hub-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.innerText.toLowerCase().includes(skill));
+    });
+    
+    document.querySelectorAll('.hub-btn').forEach(b => b.disabled = true);
+    const pool = RAW_DATABASE.filter(q => q.skill === skill);
+    activePool = fisherYatesShuffle(pool);
+    currentQuestIndex = 0;
+    
+    await loadCurrentQuest();
+    document.querySelectorAll('.hub-btn').forEach(b => b.disabled = false);
+}
+
+async function loadCurrentQuest() {
+    clearInterval(timerInterval);
+    document.querySelectorAll('.hub-btn, .game-btn').forEach(b => b.disabled = true);
+    
+    if (currentQuestIndex >= activePool.length) {
+        let newQuest = await callAI_GenerateQuest(currentSkill);
+        activePool.push(newQuest);
+    }
+
+    currentQuest = activePool[currentQuestIndex];
+    timeLeft = currentQuest.time || 40;
+    floorLevel++;
+
+    const mName = document.getElementById('monster-name');
+    const mAvt = document.getElementById('monster-avatar');
+    mAvt.innerText = currentQuest.avatar || '👾';
+    
+    if (floorLevel % 10 === 0) {
+        mName.innerText = "GIÁM KHẢO AI TỐI THƯỢNG (BOSS)";
+        mName.style.color = "#ff4757";
+        mAvt.style.transform = "scale(1.3)";
+        timeLeft = 60;
+    } else {
+        mName.innerText = currentQuest.monster || 'Thủ Hộ Hầm Ngục';
+        mName.style.color = "var(--gold)";
+        mAvt.style.transform = "scale(1)";
+    }
+
+    document.getElementById('monster-meta').innerText = `Tầng ${floorLevel} • Vực Sâu Hỗn Mang`;
+    document.getElementById('quest-badge').innerText = (currentQuest.type || 'QUEST').replace(/_/g, ' ');
+
+    const ctxContainer = document.getElementById('quest-context-container');
+    if (currentQuest.skill === 'listening') {
+        ctxContainer.innerHTML = `<div class="passage-text" style="font-style: italic; color: #8a99ad; text-align: center;">🔒 (Listening: Script ẩn. Bật Audio để nghe)</div>`;
+    } else if (currentQuest.context) {
+        ctxContainer.innerHTML = `<div class="passage-text">${currentQuest.context}</div>`;
+    } else {
+        ctxContainer.innerHTML = '';
+    }
+
+    document.getElementById('quest-prompt').innerHTML = `<b>Nhiệm vụ:</b> ${currentQuest.prompt}`;
+    
+    document.querySelectorAll('.hub-btn').forEach(b => b.disabled = false);
+    renderInputForQuest(currentQuest);
+
+    updateTimerUI();
+    startTimer();
+    log(`⚔️ Tầng ${floorLevel}: ${currentQuest.monster} xuất hiện!`);
+}
+
+function renderInputForQuest(q) {
+    const inputContainer = document.getElementById('quest-input-container');
+    const actionsContainer = document.getElementById('quest-actions');
+
+    if (q.type === 'TRUE_FALSE_NOT_GIVEN' || q.type === 'MULTIPLE_CHOICE') {
+        const rawOptions = Array.isArray(q.options) && q.options.length > 0 
+            ? q.options 
+            : ["TRUE", "FALSE", "NOT GIVEN"];
+        const opts = q.type === 'MULTIPLE_CHOICE' ? fisherYatesShuffle(rawOptions) : rawOptions;
+        
+        inputContainer.innerHTML = opts.map(opt => `
+            <label class="option-item"><input type="radio" name="user_choice" value="${opt}"> ${opt}</label>
+        `).join('');
+        actionsContainer.innerHTML = `
+            <button class="game-btn btn-submit" onclick="checkAnswerAsync()">TẤN CÔNG (SUBMIT)</button>
+            ${q.skill === 'listening' ? '<button class="game-btn btn-audio" onclick="playAudioWhisper()">🔊 AUDIO</button>' : '<button class="game-btn btn-hint" onclick="sacrificeHPHint()">GỢI Ý (-15 HP)</button>'}
+        `;
+    }
+    else if (q.type === 'SHORT_ANSWER') {
+        inputContainer.innerHTML = `<input type="text" id="text-answer-input" class="quest-input" placeholder="Nhập đáp án (Nhấn Enter để nộp)..." onkeydown="if(event.key==='Enter') checkAnswerAsync()">`;
+        actionsContainer.innerHTML = `
+            <button class="game-btn btn-submit" onclick="checkAnswerAsync()">TẤN CÔNG (SUBMIT)</button>
+            ${q.skill === 'listening' ? '<button class="game-btn btn-audio" onclick="playAudioWhisper()">🔊 AUDIO</button>' : '<button class="game-btn btn-hint" onclick="sacrificeHPHint()">GỢI Ý (-15 HP)</button>'}
+        `;
+    }
+    else if (q.type === 'REBUTTAL_WRITING') {
+        inputContainer.innerHTML = `<textarea id="text-answer-input" class="quest-input" rows="2" placeholder="Nhập câu trả lời hoàn chỉnh của bạn..."></textarea>`;
+        actionsContainer.innerHTML = `<button class="game-btn btn-submit" id="btn-write" onclick="handleWritingAsync()">TẤN CÔNG (SUBMIT)</button>`;
+    }
+    else if (q.type === 'SPEAKING_PROMPT') {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let micBtnHTML = '';
+        if (!SpeechRecognition) {
+            micBtnHTML = `<button class="game-btn btn-audio" disabled style="background:#555;cursor:not-allowed;">🚫 KHÔNG HỖ TRỢ MIC (DÙNG CHROME)</button>`;
+        } else {
+            micBtnHTML = `<button class="game-btn btn-audio" id="mic-trigger-btn" onclick="toggleSpeakingRecord()">🎙️ BẤM ĐỂ NÓI</button>`;
+        }
+
+        inputContainer.innerHTML = `
+            <div id="speaking-status" style="font-family: var(--font-game); color: var(--gold); margin-bottom: 8px;">Trạng thái: Sẵn sàng micro...</div>
+            <div id="speech-transcript" class="passage-text" style="min-height: 50px; font-style: italic;">(Giọng nói sẽ hiển thị tại đây...)</div>
+        `;
+        actionsContainer.innerHTML = micBtnHTML;
+    }
+}
+
+// ==========================================
+// CHẤM ĐÁP ÁN (ASYNC)
+// ==========================================
+async function checkAnswerAsync() {
+    let userAns = '';
+    if (currentQuest.type === 'SHORT_ANSWER') {
+        const inputEl = document.getElementById('text-answer-input');
+        if (!inputEl) return;
+        userAns = inputEl.value.trim().toLowerCase();
+        if (!userAns) return log('⚠️ Vui lòng nhập đáp án!');
+    } else {
+        const checked = document.querySelector('input[name="user_choice"]:checked');
+        if (!checked) return log('⚠️ Vui lòng chọn đáp án!');
+        userAns = checked.value.trim().toLowerCase();
+    }
+
+    const correctAnsList = Array.isArray(currentQuest.answer) 
+        ? currentQuest.answer.map(a => String(a).toLowerCase()) 
+        : [String(currentQuest.answer).toLowerCase()];
+
+    const isCorrect = correctAnsList.some(validAns => {
+        if (!validAns) return false;
+        if (userAns === validAns) return true;
+        try {
+            const escaped = validAns.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(`\\b${escaped}\\b`, 'i');
+            if (regex.test(userAns)) return true;
+        } catch (e) {}
+        if (validAns.length >= 4 && Math.abs(userAns.length - validAns.length) <= 1) {
+            if (levenshtein(userAns, validAns) <= 1) return true;
+        }
+        return false;
+    });
+
+    if (isCorrect) triggerVictory();
+    else takeDamage(25, `Sai đáp án!`, currentQuest.explanation);
+}
+
+async function handleWritingAsync() {
+    const text = document.getElementById('text-answer-input').value.trim();
+    if (text.length < 10) return log('⚠️ Câu quá ngắn!');
+
+    const btn = document.getElementById('btn-write');
+    btn.disabled = true;
+    btn.innerText = "ĐANG GỬI CHO AI CHẤM...";
+    clearInterval(timerInterval);
+
+    log("👁️ Giám khảo AI đang phân tích ngữ pháp và lập luận...");
+    
+    let result = await callAI_EvaluateWriting(text, currentQuest.context, currentQuest.prompt);
+
+    if (result.isPassed) {
+        const overlay = document.getElementById('objection-overlay');
+        document.getElementById('objection-sub').innerText = `"${text}"`;
+        overlay.style.display = 'flex';
+        setTimeout(() => {
+            overlay.style.display = 'none';
+            triggerVictory(result.feedback);
+        }, 1200);
+    } else {
+        takeDamage(result.damage || 30, 'Phản biện thất bại!', result.feedback);
+        if (playerHP > 0) {
+            btn.disabled = false;
+            btn.innerText = "TẤN CÔNG LẠI (SUBMIT)";
+            startTimer();
+        }
+    }
+}
+
+// ==========================================
+// FLUENCY ENGINE (SPEAKING)
+// ==========================================
+let recognitionInstance = null;
+let speechStartTime = 0;
+let isRecording = false;
+
+function toggleSpeakingRecord() {
+    if (isRecording) {
+        if (recognitionInstance) recognitionInstance.stop();
+        return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const micBtn = document.getElementById('mic-trigger-btn');
+    const statusBox = document.getElementById('speaking-status');
+    const transcriptBox = document.getElementById('speech-transcript');
+
+    recognitionInstance = new SpeechRecognition();
+    recognitionInstance.lang = 'en-US';
+    recognitionInstance.continuous = true;
+    recognitionInstance.interimResults = true;
+
+    recognitionInstance.onstart = () => {
+        isRecording = true;
+        speechStartTime = Date.now();
+        micBtn.innerText = '🔴 ĐANG THU (Bấm để DỪNG)';
+        micBtn.style.background = 'var(--hp-red)';
+        transcriptBox.innerText = '';
+        statusBox.innerText = "Trạng thái: Đang lắng nghe luồng âm thanh...";
+        clearInterval(timerInterval);
+    };
+
+    recognitionInstance.onresult = (e) => {
+        let res = '';
+        for (let i = 0; i < e.results.length; i++) res += e.results[i][0].transcript + ' ';
+        transcriptBox.innerText = res;
+    };
+
+    recognitionInstance.onerror = (e) => {
+        log("⚠️ Lỗi Mic: " + e.error);
+        resetMicUI();
+        startTimer();
+    };
+
+    recognitionInstance.onend = () => {
+        isRecording = false;
+        resetMicUI();
+        processFluencyResult(transcriptBox.innerText);
+    };
+
+    recognitionInstance.start();
+}
+
+function resetMicUI() {
+    const micBtn = document.getElementById('mic-trigger-btn');
+    if (micBtn) {
+        micBtn.innerText = '🎙️ BẤM ĐỂ NÓI LẠI';
+        micBtn.style.background = '#3498db';
+    }
+}
+
+function processFluencyResult(transcript) {
+    let durationSeconds = (Date.now() - speechStartTime) / 1000;
+    if (durationSeconds <= 0) durationSeconds = 1;
+
+    let words = transcript.trim().split(/\s+/).filter(Boolean);
+    let wordCount = words.length;
+    let wpm = Math.round((wordCount / durationSeconds) * 60);
+
+    document.getElementById('speaking-status').innerText = `Kết quả: ${wordCount} từ | ${durationSeconds.toFixed(1)}s | Tốc độ: ${wpm} WPM`;
+
+    if (wordCount > 10 && wpm > 90) {
+        triggerVictory(`Đỉnh cao Fluency! Tốc độ của bạn đạt ${wpm} WPM.`);
+    } else if (wordCount <= 10) {
+        takeDamage(20, `Quá ngắn (${wordCount} từ).`, "Cần khai triển ý dài hơn để giám khảo đánh giá.");
+        if (playerHP > 0) startTimer();
+    } else {
+        takeDamage(25, `Ngập ngừng quá nhiều (WPM: ${wpm}).`, "Tốc độ tiêu chuẩn IELTS cần > 90 WPM. Hãy luyện nối âm.");
+        if (playerHP > 0) startTimer();
+    }
+}
+
+// ==========================================
+// CORE SYSTEM HELPERS
+// ==========================================
+function playAudioWhisper() {
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(currentQuest.context || currentQuest.prompt);
+        utter.rate = 0.9; utter.pitch = 0.85; utter.lang = 'en-US';
+        window.speechSynthesis.speak(utter);
+    } else log('⚠️ Trình duyệt không hỗ trợ Audio.');
+}
+
+function sacrificeHPHint() {
+    if (playerHP <= 15) return log('⚠️ Máu quá thấp (<= 15 HP), không thể hiến máu!');
+    takeDamage(15, 'Đã hiến 15 HP đổi Gợi Ý!', `💡 GỢI Ý: ${currentQuest.hint || 'Hãy đọc kỹ từ khóa trong câu hỏi.'}`);
+}
+
+function takeDamage(amt, reason, explanation = null) {
+    playerHP = Math.max(0, playerHP - amt);
+    updateHPBar();
+    
+    let msg = `💥 ${reason}`;
+    if (explanation) msg += ` | Sư phạm: ${explanation}`;
+    log(msg);
+
+    if (playerHP <= 0) {
+        clearInterval(timerInterval);
+        if (isRecording && recognitionInstance) recognitionInstance.stop();
+        setTimeout(() => { document.getElementById('game-over-overlay').style.display = 'flex'; }, 500);
+    }
+}
+
+function triggerVictory(customMsg) {
+    clearInterval(timerInterval);
+    gainEXP(30); 
+
+    let msg = customMsg || 'Kẻ thù đã bị thanh tẩy!';
+    if (floorLevel % 5 === 0) {
+        const loot = LOOT_POOL[Math.floor(Math.random() * LOOT_POOL.length)];
+        msg += ` 🎁 Nhặt được: ${loot}!`;
+    }
+
+    log(`🎉 CHIẾN THẮNG: ${msg}`);
+    document.getElementById('quest-actions').innerHTML = `<button class="game-btn btn-next" onclick="nextQuestAsync()">TIẾN LÊN TẦNG TIẾP THEO ➔</button>`;
+}
+
+async function nextQuestAsync() {
+    currentQuestIndex++;
+    await loadCurrentQuest();
+}
+
+function updateHPBar() {
+    const bar = document.getElementById('player-hp');
+    const pct = (playerHP / maxHP) * 100;
+    bar.style.width = pct + '%';
+    document.getElementById('hp-num').innerText = `${playerHP}/${maxHP}`;
+    bar.style.backgroundColor = pct < 30 ? 'var(--hp-red)' : 'var(--hp-green)';
+}
+
+function startTimer() {
+    clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+        timeLeft--;
+        updateTimerUI();
+        if (timeLeft <= 0) {
+            clearInterval(timerInterval);
+            takeDamage(30, 'HẾT GIỜ! Quái vật đánh đòn sấm sét!');
+            if (playerHP > 0) nextQuestAsync();
+        }
+    }, 1000);
+}
+
+function updateTimerUI() { document.getElementById('timer-box').innerText = `⏳ ${timeLeft}s`; }
+function log(txt) { document.getElementById('battle-log').innerText = txt; }
+
+function restartGame() {
+    document.getElementById('game-over-overlay').style.display = 'none';
+    playerHP = maxHP;
+    playerEXP = 0;
+    currentBandIndex = 0;
+    floorLevel = 0;
+    updateBandUI();
+    updateHPBar();
+    selectSkill(currentSkill);
+}
+
+// Khởi chạy game lần đầu
+updateBandUI();
+selectSkill('reading');
+</script>
+</body>
+</html>
