@@ -101,8 +101,8 @@ STRICT MICRO-LEARNING RULES:
 - "prompt": Maximum 20 words. CRITICAL: If the task is Gap-fill or Note Completion, "prompt" MUST include the target sentence with a blank slot marked as "[...]".
 - "options": Array of 3 choices (or ["TRUE", "FALSE", "NOT GIVEN"]).
 - "answer": Array of valid correct lowercase answers (e.g. ["circulation", "flow"]).
-- "explanation": Maximum 15 words in English following formula "Keyword A = Keyword B" (e.g. "'depart' = leave").
-- "hint": Under 8 words in English.
+- "explanation": Maximum 15 words in English explaining the concept/vocabulary (e.g. "'depart' means to leave").
+- "hint": Under 8 words in English (a guiding clue, DO NOT include the actual answer word).
 - "time": 40
 
 Return ONLY raw JSON (no markdown \`\`\`json):
