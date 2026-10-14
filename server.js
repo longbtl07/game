@@ -8,14 +8,14 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Phục vụ giao diện web tĩnh khi đưa lên Render
+// Serve static frontend files on Render
 app.use(express.static(__dirname));
 
-// Khởi tạo SDK mới nhất của Google
+// Initialize Google GenAI SDK
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 const MODEL_NAME = process.env.MODEL_NAME || 'gemini-flash-lite-latest';
 
-// Utility làm sạch và bóc tách JSON an toàn từ kết quả AI
+// Utility to clean and extract valid JSON from model output
 const cleanJSON = (text) => {
     if (!text) return {};
     const unmarkdown = text.replace(/```json/gi, '').replace(/```/g, '').trim();
@@ -23,89 +23,103 @@ const cleanJSON = (text) => {
     return JSON.parse(match ? match[0] : unmarkdown);
 };
 
-// Kho dạng bài đa dạng cho từng kỹ năng (Tương thích 100% với UI hiện tại)
+// Comprehensive task pool for all skills (English interface & strict format)
 const TASK_POOL = {
     reading: [
         {
             type: 'TRUE_FALSE_NOT_GIVEN',
-            instruction: 'Tạo 1-2 câu văn học thuật ngắn (25-35 từ) và 1 mệnh đề nhận định. options bắt buộc là ["TRUE", "FALSE", "NOT GIVEN"].'
+            instruction: 'Create 1-2 academic sentences (25-35 words) in "context", and 1 specific claim in "prompt". "options" MUST be exactly ["TRUE", "FALSE", "NOT GIVEN"].'
         },
         {
             type: 'MULTIPLE_CHOICE',
-            instruction: 'Tạo 1-2 câu văn (25-35 từ). Hỏi ý chính hoặc từ đồng nghĩa (Paraphrase). options gồm 3 lựa chọn ngắn gọn (dưới 6 từ mỗi lựa chọn).'
+            instruction: 'Create 1-2 sentences (25-35 words) in "context". "prompt" is a direct question on main idea or paraphrase. "options" contains 3 concise choices (under 6 words each).'
         },
         {
             type: 'SHORT_ANSWER',
-            instruction: 'Dạng Gap-fill (Điền khuyết): Tạo 1-2 câu văn (25-35 từ). Câu hỏi là 1 câu tóm tắt có chỗ trống ký hiệu là [...]. Yêu cầu điền 1 từ (1 WORD ONLY).'
+            instruction: 'Summary Gap-fill: "context" is 1-2 sentences (25-35 words). "prompt" MUST contain a summary sentence with a blank slot marked as "[...]" (e.g. "Complete summary: Exercise boosts blood [...] in the body. (1 WORD ONLY)"). "answer" is the single missing word.'
         },
         {
             type: 'SHORT_ANSWER',
-            instruction: 'Dạng Tìm từ (Word Hunt): Tạo 1-2 câu văn (25-35 từ). Yêu cầu tìm đúng 1 từ trong đoạn văn đồng nghĩa với 1 từ cho sẵn (1 WORD ONLY).'
+            instruction: 'Word Hunt: "context" is 1-2 sentences (25-35 words). "prompt" MUST ask to locate 1 word from the text (e.g. "Find 1 word in the text that means \'ruined\' (1 WORD ONLY)."). "answer" is that exact word.'
         }
     ],
     listening: [
         {
             type: 'SHORT_ANSWER',
-            instruction: 'Dạng Note Completion: Tạo 1 thông báo/đoạn hội thoại tự nhiên (20-30 từ). Câu hỏi có chỗ trống [...] cần điền 1 từ hoặc 1 con số/giờ giấc (1 WORD/NUMBER).'
+            instruction: 'Note Completion: "context" is a spoken announcement/dialogue (20-30 words) with clear facts. "prompt" MUST be a note with a blank marked as "[...]" (e.g. "Note: Flight to Tokyo departs at [...] (1 WORD/NUMBER)."). "answer" is 1 word or number.'
         },
         {
             type: 'MULTIPLE_CHOICE',
-            instruction: 'Tạo 1 lời thoại ngắn (20-30 từ). Đặt câu hỏi ngắn gọn và cung cấp mảng options gồm 3 phương án ngắn (dưới 5 từ mỗi phương án).'
+            instruction: 'Spoken Dialogue: "context" is 1 spoken dialogue (20-30 words). "prompt" is 1 question about what was said (under 12 words). "options" has 3 short choices.'
         }
     ],
     writing: [
         {
             type: 'REBUTTAL_WRITING',
-            instruction: 'Dạng Phản biện: context là 1 nhận định cực đoan ngắn (10-15 từ). prompt yêu cầu viết 1 câu phản bác dùng từ nối (Although / However / While).'
+            instruction: 'Rebuttal Challenge: "context" is an extreme statement (10-15 words). "prompt" is: "Write 1 sentence rebutting this using Although, However, or While."'
         },
         {
             type: 'REBUTTAL_WRITING',
-            instruction: 'Dạng Paraphrase: context là 1 câu đơn Band 5.0 (10-15 từ) kèm nhiệm vụ trong ngoặc. prompt yêu cầu viết lại câu đó dùng từ vựng Band 7.0+ hoặc cấu trúc câu ghép.'
+            instruction: 'Paraphrase Challenge: "context" is a basic Band 5.0 sentence (10-15 words). "prompt" is: "Rewrite this sentence using advanced academic vocabulary or compound structure."'
         },
         {
             type: 'REBUTTAL_WRITING',
-            instruction: 'Dạng Sửa lỗi (Fix the Sentence): context là 1 câu tiếng Anh có 1 lỗi ngữ pháp hoặc dùng từ sai rõ rệt. prompt yêu cầu học sinh viết lại câu hoàn chỉnh đã sửa lỗi.'
+            instruction: 'Sentence Fix: "context" is a sentence with 1 obvious grammatical error. "prompt" is: "Rewrite the sentence with the grammatical error corrected."'
         }
     ],
     speaking: [
         {
             type: 'SPEAKING_PROMPT',
-            instruction: 'Dạng Speaking Part 1: context ghi ngắn gọn "Gợi ý từ vựng: [cho 2-3 collocations ngắn]". prompt là 1 câu hỏi phản xạ gần gũi (8-12 từ).'
+            instruction: 'Speaking Part 1: "context" is: "Vocabulary cues: [provide 2-3 natural collocations]". "prompt" is a direct conversation question (8-12 words).'
         }
     ]
 };
 
-// API 1: Sinh đề đa dạng & ngắn gọn
+// API 1: Generate Quest with linear Band difficulty and strict English formatting
 app.post('/api/generate-quest', async (req, res) => {
     try {
-        const { skill } = req.body;
+        const { skill = 'reading', band = '4.0' } = req.body;
         const skillTasks = TASK_POOL[skill] || TASK_POOL.reading;
         const chosenTask = skillTasks[Math.floor(Math.random() * skillTasks.length)];
 
-        const prompt = `Bạn là Game Master thiết kế câu hỏi IELTS ngắn gọn cho học sinh.
-        Kỹ năng: "${skill}" | Loại UI: "${chosenTask.type}"
-        Nhiệm vụ thiết kế: ${chosenTask.instruction}
+        const prompt = `You are an elite IELTS Dungeon Master designing a bite-sized RPG challenge.
+Target Skill: "${skill}"
+UI Type: "${chosenTask.type}"
+Target IELTS Band Difficulty: "${band}" (Scale: 4.0 to 8.0)
+Task Instruction: ${chosenTask.instruction}
 
-        QUY TẮC CHỐNG NGỘP CHỮ (BẮT BUỘC):
-        - "context": Cực ngắn (tối đa 35 từ), súc tích, đi thẳng vào trọng tâm.
-        - "prompt": Chỉ dẫn siêu ngắn (tối đa 15 từ). Dùng từ ngữ trực diện, dễ hiểu.
-        - "explanation": Giải thích tối đa 15 từ theo công thức "Từ A = Từ B" (VD: "'keep free of litter' = không có rác").
-        - "hint": Gợi ý siêu ngắn dưới 8 từ.
+DIFFICULTY SCALING RULES FOR BAND ${band}:
+- Band 4.0 - 5.0: Elementary to pre-intermediate. Simple everyday vocabulary, basic syntax, direct matching.
+- Band 5.5 - 6.5: Intermediate to upper-intermediate. Standard academic topics, compound sentences, simple synonyms.
+- Band 7.0 - 8.0: Advanced academic. C1-C2 vocabulary, complex syntax, nuanced paraphrasing, subtle distractors.
 
-        Trả về ĐÚNG JSON nguyên bản (không dùng markdown \`\`\`json):
-        {
-            "skill": "${skill}",
-            "type": "${chosenTask.type}",
-            "monster": "Tên quái vật ngắn (2-4 chữ)",
-            "avatar": "1 emoji quái vật",
-            "context": "...",
-            "prompt": "...",
-            "options": ["Phương án A", "Phương án B", "Phương án C"],
-            "answer": ["đáp án chính", "từ đồng nghĩa 1", "từ đồng nghĩa 2"],
-            "explanation": "...",
-            "hint": "...",
-            "time": 45
-        }`;
+STRICT MICRO-LEARNING RULES:
+- Everything MUST BE IN ENGLISH (monster names, prompts, explanations, hints).
+- "monster": Cool fantasy RPG monster name in English (2-3 words, e.g. "Shadow Drake", "Abyssal Viper", "Obsidian Sphinx", "Frost Golem").
+- "avatar": 1 matching emoji.
+- "context": Maximum 35 words. For Listening, this is the spoken script to be read aloud.
+- "prompt": Maximum 20 words. CRITICAL: If the task is Gap-fill or Note Completion, "prompt" MUST include the target sentence with a blank slot marked as "[...]".
+- "options": Array of 3 choices (or ["TRUE", "FALSE", "NOT GIVEN"]).
+- "answer": Array of valid correct lowercase answers (e.g. ["circulation", "flow"]).
+- "explanation": Maximum 15 words in English following formula "Keyword A = Keyword B" (e.g. "'depart' = leave").
+- "hint": Under 8 words in English.
+- "time": 40
+
+Return ONLY raw JSON (no markdown \`\`\`json):
+{
+    "skill": "${skill}",
+    "type": "${chosenTask.type}",
+    "band": "${band}",
+    "monster": "Shadow Drake",
+    "avatar": "🐉",
+    "context": "...",
+    "prompt": "...",
+    "options": ["Option A", "Option B", "Option C"],
+    "answer": ["answer1", "synonym2"],
+    "explanation": "...",
+    "hint": "...",
+    "time": 40
+}`;
 
         const response = await ai.models.generateContent({
             model: MODEL_NAME,
@@ -118,31 +132,33 @@ app.post('/api/generate-quest', async (req, res) => {
         const quest = cleanJSON(response.text);
         res.json({ success: true, quest });
     } catch (error) {
-        console.error('Lỗi sinh đề:', error);
+        console.error('Quest generation error:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 });
 
-// API 2: Chấm Writing súc tích, dễ hiểu
+// API 2: Evaluate Writing with concise English feedback
 app.post('/api/evaluate-writing', async (req, res) => {
     try {
-        const { userText, context, prompt: questPrompt } = req.body;
-        const prompt = `Bạn là giám khảo IELTS chấm câu ngắn cho học sinh.
-        Đề bài: "${context}" ${questPrompt ? `- Yêu cầu: "${questPrompt}"` : ''}
-        Bài làm của học sinh: "${userText}"
+        const { userText, context, prompt: questPrompt, band = '4.0' } = req.body;
+        const prompt = `You are a friendly IELTS Examiner grading a micro-writing challenge.
+Target Band: "${band}"
+Original Context: "${context}"
+Task Prompt: "${questPrompt || ''}"
+Student Response: "${userText}"
 
-        QUY TẮC CHẤM:
-        - Chấp nhận cho qua (isPassed: true) nếu câu đúng ngữ pháp cơ bản và giải quyết đúng yêu cầu đề bài.
-        - Nhận xét (feedback) bằng tiếng Việt, xưng hô thân thiện, ĐỘ DÀI TỐI ĐA 1 CÂU (dưới 20 từ).
-        - Nếu sai: Chỉ thẳng vị trí sai và cách sửa ngắn gọn (VD: "Sai chia động từ 'causes', hãy sửa thành 'cause'.").
+EVALUATION RULES:
+- Give isPassed: true if the sentence has acceptable grammar and satisfies the prompt for Band ${band}.
+- "feedback" MUST be in ENGLISH, friendly tone, MAXIMUM 1 SHORT SENTENCE (under 20 words).
+- If incorrect: Point out the exact error and give the quick fix (e.g. "Change 'causes' to 'cause' to match plural subject.").
 
-        Trả về ĐÚNG JSON nguyên bản (không dùng markdown):
-        {
-            "isPassed": true,
-            "feedback": "1 câu nhận xét cực ngắn gọn",
-            "damage": 0
-        }
-        (Nếu isPassed là false thì đặt damage: 25)`;
+Return ONLY raw JSON:
+{
+    "isPassed": true,
+    "feedback": "Concise 1-sentence feedback in English.",
+    "damage": 0
+}
+(If isPassed is false, set damage: 25)`;
 
         const response = await ai.models.generateContent({
             model: MODEL_NAME,
@@ -155,15 +171,15 @@ app.post('/api/evaluate-writing', async (req, res) => {
         const evaluation = cleanJSON(response.text);
         res.json({ success: true, evaluation });
     } catch (error) {
-        console.error('Lỗi chấm Writing:', error);
+        console.error('Writing evaluation error:', error);
         res.status(500).json({
             success: false,
-            evaluation: { isPassed: false, feedback: 'Lỗi kết nối AI Giám khảo.', damage: 15 }
+            evaluation: { isPassed: false, feedback: 'AI Examiner connection lost.', damage: 15 }
         });
     }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`🚀 Avalon Backend đang chạy tại http://localhost:${PORT}`);
+    console.log(`🚀 Avalon Backend running at http://localhost:${PORT}`);
 });

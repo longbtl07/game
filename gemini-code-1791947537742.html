@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -40,6 +40,19 @@
             box-shadow: 0 10px 40px rgba(0,0,0,0.85);
             overflow: hidden;
             position: relative;
+            transition: transform 0.1s ease;
+        }
+
+        /* Screen shake on damage */
+        @keyframes screenDamage {
+            0%, 100% { transform: translate(0, 0); }
+            20% { transform: translate(-8px, 6px); }
+            40% { transform: translate(8px, -6px); }
+            60% { transform: translate(-6px, 3px); }
+            80% { transform: translate(6px, -3px); }
+        }
+        .screen-shake {
+            animation: screenDamage 0.4s ease-in-out;
         }
 
         header {
@@ -118,6 +131,7 @@
             align-items: center;
             justify-content: center;
             text-align: center;
+            position: relative;
             transition: all 0.3s ease;
         }
         .monster-avatar {
@@ -126,11 +140,47 @@
             filter: drop-shadow(0 0 12px rgba(255,255,255,0.25));
             animation: bounce 2s infinite alternate ease-in-out;
             transition: transform 0.3s;
+            display: inline-block;
         }
         @keyframes bounce {
             0% { transform: translateY(0); }
             100% { transform: translateY(-10px); }
         }
+
+        /* Monster Hit Animation */
+        @keyframes monsterHitKeyframes {
+            0% { transform: scale(1) translateX(0); filter: brightness(1); }
+            15% { transform: scale(0.82) translateX(-16px) rotate(-14deg); filter: brightness(2.5) drop-shadow(0 0 20px #e74c3c); }
+            35% { transform: scale(0.88) translateX(16px) rotate(12deg); filter: brightness(3) drop-shadow(0 0 25px #e74c3c); }
+            55% { transform: scale(0.94) translateX(-10px) rotate(-6deg); filter: brightness(1.8) drop-shadow(0 0 15px #e74c3c); }
+            75% { transform: scale(1.1) translateX(4px); }
+            100% { transform: scale(1) translateX(0); filter: none; }
+        }
+        .monster-hit {
+            animation: monsterHitKeyframes 0.65s cubic-bezier(0.36, 0.07, 0.19, 0.97) !important;
+        }
+
+        /* Floating Crit/Damage text */
+        .crit-text {
+            position: absolute;
+            top: 25%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: var(--font-game);
+            font-size: 24px;
+            font-weight: 800;
+            color: #ff4757;
+            text-shadow: 2px 2px 0 #000, 0 0 12px #ff4757;
+            pointer-events: none;
+            animation: floatUpAnim 0.75s ease-out forwards;
+            z-index: 50;
+        }
+        @keyframes floatUpAnim {
+            0% { opacity: 0; transform: translate(-50%, 0) scale(0.4); }
+            25% { opacity: 1; transform: translate(-50%, -15px) scale(1.2); }
+            100% { opacity: 0; transform: translate(-50%, -50px) scale(1); }
+        }
+
         .monster-name {
             font-family: var(--font-game);
             font-size: 16px;
@@ -166,6 +216,7 @@
             color: #fff;
             margin-bottom: 10px;
             font-weight: 700;
+            letter-spacing: 0.5px;
         }
         .passage-text {
             background: #080911;
@@ -182,6 +233,25 @@
             font-size: 15px;
             line-height: 1.6;
             margin-bottom: 14px;
+            font-weight: 500;
+        }
+
+        /* Blank slot highlight */
+        .blank-slot {
+            display: inline-block;
+            padding: 2px 10px;
+            background: rgba(241, 196, 15, 0.15);
+            border: 2px dashed var(--gold);
+            color: var(--gold);
+            border-radius: 4px;
+            font-weight: 700;
+            margin: 0 4px;
+            letter-spacing: 1px;
+            animation: blankPulse 2s infinite ease-in-out;
+        }
+        @keyframes blankPulse {
+            0%, 100% { box-shadow: 0 0 0 rgba(241, 196, 15, 0); }
+            50% { box-shadow: 0 0 8px rgba(241, 196, 15, 0.5); }
         }
 
         .option-item {
@@ -263,7 +333,7 @@
         #game-over-overlay {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(15, 17, 32, 0.95);
+            background: rgba(15, 17, 32, 0.96);
             display: none;
             flex-direction: column;
             justify-content: center;
@@ -307,12 +377,12 @@
 
     <div id="game-over-overlay">
         <div class="game-over-text">DEFEATED</div>
-        <button class="game-btn btn-submit" style="margin-top: 20px; font-size: 16px;" onclick="restartGame()">HỒI SINH (Restart)</button>
+        <button id="btn-restart" class="game-btn btn-submit" style="margin-top: 20px; font-size: 16px;" onclick="restartGame()">REVIVE (RESTART)</button>
     </div>
 
     <header>
         <div id="player-band" style="color: var(--gold); font-weight: bold; font-size: 16px;">
-            BAND 6.0 <span style="font-size: 12px; color: #8a99ad;">(EXP: 0 / 100)</span>
+            BAND 4.0 <span style="font-size: 12px; color: #8a99ad;">(EXP: 0 / 50)</span>
         </div>
         <div>
             HP: 
@@ -331,46 +401,47 @@
     </div>
 
     <div class="arena">
-        <div class="monster-view">
+        <div class="monster-view" id="monster-view-box">
             <div id="monster-avatar" class="monster-avatar">🗿</div>
-            <div id="monster-name" class="monster-name">Thạch Nhân Sphinx</div>
-            <div id="monster-meta" style="font-size: 13px; color: #8a99ad; margin-top: 4px;">Tầng 1 • Vực Sâu</div>
-            <div class="timer-display" id="timer-box">⏳ 45s</div>
+            <div id="monster-name" class="monster-name">Obsidian Sphinx</div>
+            <div id="monster-meta" style="font-size: 13px; color: #8a99ad; margin-top: 4px;">Floor 1 • Abyss of Chaos</div>
+            <div class="timer-display" id="timer-box">⏳ 40s</div>
         </div>
 
         <div class="quest-box">
             <div>
-                <span id="quest-badge" class="badge-type">ĐANG TẢI...</span>
+                <span id="quest-badge" class="badge-type">LOADING...</span>
                 <div id="quest-context-container"></div>
-                <div class="quest-desc" id="quest-prompt">Đang kết nối tới Oracle AI...</div>
+                <div class="quest-desc" id="quest-prompt">Connecting to Oracle AI...</div>
                 <div id="quest-input-container"></div>
             </div>
             <div class="action-row" id="quest-actions"></div>
         </div>
     </div>
 
-    <div class="battle-log" id="battle-log">⚔️ Chào mừng học sĩ đã bước vào hầm ngục ngôn ngữ Avalon!</div>
+    <div class="battle-log" id="battle-log">⚔️ Welcome to Avalon IELTS RPG. Select a skill to begin dungeon exploration!</div>
 </div>
 
 <script>
 // ==========================================
-// CẤU HÌNH API TỰ ĐỘNG (CHẠY ĐƯỢC CẢ LOCAL LẪN RENDER)
+// API CONFIGURATION (LOCAL & RENDER COMPATIBLE)
 // ==========================================
 const API_BASE_URL = window.location.protocol === 'file:' 
     ? 'https://game-3qxq.onrender.com/api' 
     : '/api';
 
 // ==========================================
-// 1. GIAO TIẾP VỚI SERVER AI (FETCH API)
+// 1. AI SERVER COMMUNICATION
 // ==========================================
 async function callAI_GenerateQuest(skill) {
-    log("🔮 Oracle AI đang bẻ cong không gian để sinh đề...");
+    log("🔮 Oracle AI is bending dimensions to summon a quest...");
+    const currentBand = BAND_THRESHOLDS[currentBandIndex].band;
     
     try {
         const response = await fetch(`${API_BASE_URL}/generate-quest`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ skill: skill })
+            body: JSON.stringify({ skill: skill, band: currentBand })
         });
         
         const data = await response.json();
@@ -378,33 +449,39 @@ async function callAI_GenerateQuest(skill) {
         if (data.success && questData) {
             return questData;
         } else {
-            throw new Error("Dữ liệu trả về bị lỗi hoặc rỗng");
+            throw new Error("Invalid or empty response from server");
         }
     } catch (error) {
         console.error("AI Generation Error:", error);
-        log("⚠️ Mạng tinh thể Oracle bị nhiễu. Sử dụng dữ liệu dự phòng!");
+        log("⚠️ Oracle crystal disrupted. Engaging emergency backup challenge!");
         
         return {
             skill: skill,
+            band: currentBand,
             type: skill === 'writing' ? "REBUTTAL_WRITING" : (skill === 'speaking' ? "SPEAKING_PROMPT" : "SHORT_ANSWER"),
-            monster: "Bóng Ma Mất Kết Nối",
+            monster: "Disconnection Phantom",
             avatar: "📡",
-            context: skill === 'speaking' ? "Sử dụng Micro." : "Due to a network anomaly, you are facing a manual challenge. Answer the prompt.",
-            prompt: skill === 'writing' ? "Phản bác: 'Technology is completely useless in education'." : (skill === 'speaking' ? "Do you think technology helps students learn better? Why?" : "What is a common synonym of 'vital'? (ONE WORD)"),
-            answer: skill === 'writing' ? ["although", "however"] : ["important", "crucial", "essential", "necessary"],
-            explanation: "Dữ liệu offline do mất kết nối server AI.",
-            hint: "Đáp án có thể là 'important', 'crucial' hoặc dùng 'however'.",
-            time: 45
+            context: skill === 'speaking' ? "Vocabulary cues: [benefit, disadvantage, perspective]" : "Online education is becoming widespread. It allows students to study at their own pace.",
+            prompt: skill === 'writing' 
+                ? "Rebut: 'Online classes are completely ineffective for young learners.'"
+                : (skill === 'speaking' 
+                    ? "Do you prefer studying online or in person? Why?" 
+                    : "Complete summary: Online learning enables students to set their own [...]. (1 WORD ONLY)"),
+            answer: skill === 'writing' ? ["although", "however", "while"] : ["pace", "speed", "schedule"],
+            explanation: "'at their own pace' = set their own pace",
+            hint: "Look for word meaning speed or timing",
+            time: 40
         };
     }
 }
 
 async function callAI_EvaluateWriting(userText, questContext, questPrompt) {
+    const currentBand = BAND_THRESHOLDS[currentBandIndex].band;
     try {
         const response = await fetch(`${API_BASE_URL}/evaluate-writing`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userText: userText, context: questContext, prompt: questPrompt })
+            body: JSON.stringify({ userText: userText, context: questContext, prompt: questPrompt, band: currentBand })
         });
         
         const data = await response.json();
@@ -412,51 +489,78 @@ async function callAI_EvaluateWriting(userText, questContext, questPrompt) {
         if (data.success && evalData) {
             return evalData;
         } else {
-            throw new Error("Server trả về trạng thái lỗi");
+            throw new Error("Server returned error status");
         }
     } catch (error) {
         console.error("AI Evaluation Error:", error);
         return { 
             isPassed: false, 
-            feedback: "Server AI giám khảo mất kết nối. Đòn đánh trượt!", 
+            feedback: "AI Examiner server unreachable. Attack missed!", 
             damage: 20 
         };
     }
 }
 
 // ==========================================
-// KHO DỮ LIỆU TĨNH KHỞI TẠO (ĐÃ BỔ SUNG ĐỦ OPTIONS)
+// STATIC DATABASE FOR LEVEL 1 (BAND 4.0 START)
 // ==========================================
 const RAW_DATABASE = [
     {
         skill: "reading",
-        type: "TRUE_FALSE_NOT_GIVEN",
-        monster: "Băng Thần Nemean",
-        avatar: "🐻‍❄️",
-        context: "Polar bears are increasingly threatened. Humans with comparative levels of adipose tissue would be obese and suffer from diabetes. Yet the polar bear experiences no such consequences.",
-        prompt: "Polar bears suffer from various health problems due to the build-up of fat.",
-        options: ["TRUE", "FALSE", "NOT GIVEN"],
-        answer: ["FALSE", "F", "NO"],
-        explanation: "Đoạn văn khẳng định 'Yet the polar bear experiences no such consequences'.",
-        hint: "Gấu bắc cực không bị bệnh.",
+        band: "4.0",
+        type: "SHORT_ANSWER",
+        monster: "Slime Sentinel",
+        avatar: "🟢",
+        context: "Regular exercise maintains a healthy heart and improves blood circulation throughout the entire body.",
+        prompt: "Complete summary: Physical activity ensures good blood [...] in the human body. (1 WORD ONLY)",
+        answer: ["circulation", "flow"],
+        explanation: "'improves blood circulation' = good blood circulation",
+        hint: "Word starting with 'c' in the text",
         time: 40
     },
     {
         skill: "listening",
+        band: "4.0",
         type: "SHORT_ANSWER",
-        monster: "Mộc Tinh Sirena",
+        monster: "Echo Sprite",
         avatar: "🧚",
-        context: "One of the regular activities is trying to keep the beach free of litter.",
-        prompt: "Making sure the beach does not have [BLANK] on it.",
-        answer: ["litter", "trash", "rubbish", "garbage"],
-        explanation: "'Free of litter' = does not have litter.",
-        hint: "Từ vựng chỉ rác thải",
+        context: "Good morning passengers. The express train to London will depart at 10:15 AM from platform four.",
+        prompt: "Note: The train to London leaves at [...] from platform four. (1 WORD/NUMBER)",
+        answer: ["10:15", "10:15 am", "10.15"],
+        explanation: "'depart at 10:15 AM' = leaves at 10:15",
+        hint: "Listen for the departure time",
         time: 35
+    },
+    {
+        skill: "writing",
+        band: "4.0",
+        type: "REBUTTAL_WRITING",
+        monster: "Logic Gargoyle",
+        avatar: "🗿",
+        context: "Fast food is always healthy and never causes obesity.",
+        prompt: "Write 1 sentence rebutting this statement using Although or However.",
+        answer: ["although", "however", "while"],
+        explanation: "Use contrasting conjunctions with correct grammar.",
+        hint: "Start with 'Although fast food...'",
+        time: 45
+    },
+    {
+        skill: "speaking",
+        band: "4.0",
+        type: "SPEAKING_PROMPT",
+        monster: "Whispering Sylph",
+        avatar: "🧝",
+        context: "Vocabulary cues: [free time, unwind, outdoor activities]",
+        prompt: "What is your favorite hobby, and why do you enjoy it?",
+        answer: ["hobby", "enjoy", "relax"],
+        explanation: "Speak fluently for at least 10 words.",
+        hint: "Mention your hobby and reason",
+        time: 45
     }
 ];
 
 // ==========================================
-// THUẬT TOÁN TIỆN ÍCH
+// UTILITY ALGORITHMS
 // ==========================================
 function fisherYatesShuffle(array) {
     const arr = [...array];
@@ -481,11 +585,18 @@ function levenshtein(a, b) {
 }
 
 // ==========================================
-// HỆ THỐNG LEVEL & EXP (PROGRESSION)
+// LINEAR PROGRESSION SYSTEM (BAND 4.0 TO 8.0)
 // ==========================================
 const BAND_THRESHOLDS = [
-    { band: "6.0", exp: 0 }, { band: "6.5", exp: 100 }, { band: "7.0", exp: 250 },
-    { band: "7.5", exp: 450 }, { band: "8.0", exp: 700 }, { band: "8.5", exp: 1000 }, { band: "9.0", exp: 1500 }
+    { band: "4.0", exp: 0 },
+    { band: "4.5", exp: 50 },
+    { band: "5.0", exp: 120 },
+    { band: "5.5", exp: 210 },
+    { band: "6.0", exp: 320 },
+    { band: "6.5", exp: 450 },
+    { band: "7.0", exp: 600 },
+    { band: "7.5", exp: 800 },
+    { band: "8.0", exp: 1100 }
 ];
 
 let playerEXP = 0;
@@ -503,15 +614,15 @@ function gainEXP(amount) {
     let nextTier = BAND_THRESHOLDS[currentBandIndex + 1];
     if (nextTier && playerEXP >= nextTier.exp) {
         currentBandIndex++;
-        log(`🎉 LEVEL UP! BẠN ĐÃ ĐẠT BAND ${nextTier.band}! Sức mạnh học thuật tăng vọt!`);
-        playerHP = Math.min(maxHP, playerHP + 20);
+        log(`🎉 LEVEL UP! You attained BAND ${nextTier.band}! Academic prowess surged!`);
+        playerHP = Math.min(maxHP, playerHP + 25);
         updateHPBar();
     }
     updateBandUI();
 }
 
 // ==========================================
-// TRẠNG THÁI GAME & VÒNG LẶP GIAO DIỆN
+// GAME STATE & CORE LOOP
 // ==========================================
 let currentSkill = 'reading';
 let activePool = [];
@@ -520,9 +631,9 @@ let currentQuest = null;
 let playerHP = 100;
 let maxHP = 100;
 let timerInterval = null;
-let timeLeft = 45;
+let timeLeft = 40;
 let floorLevel = 0;
-const LOOT_POOL = ["Thẻ Bài Collocation", "Bí kíp Paraphrase", "Mảnh Giáp Inversion", "Nước Thần Lexical Resource"];
+const LOOT_POOL = ["Collocation Card", "Paraphrase Scroll", "Inversion Armor", "Lexical Resource Elixir"];
 
 async function selectSkill(skill) {
     if (isRecording && recognitionInstance) recognitionInstance.stop();
@@ -540,9 +651,17 @@ async function selectSkill(skill) {
     document.querySelectorAll('.hub-btn').forEach(b => b.disabled = false);
 }
 
+function formatPromptWithBlanks(promptText) {
+    if (!promptText) return '';
+    // Replace [...] or [BLANK] or [blank] with styled slot
+    let formatted = promptText.replace(/\[\.\.\.\]|\[BLANK\]|\[blank\]/g, '<span class="blank-slot">[ &nbsp;...&nbsp; ]</span>');
+    return formatted;
+}
+
 async function loadCurrentQuest() {
     clearInterval(timerInterval);
-    document.querySelectorAll('.hub-btn, .game-btn').forEach(b => b.disabled = true);
+    // Only disable action buttons, keep restart button intact
+    document.querySelectorAll('.hub-btn, #quest-actions .game-btn').forEach(b => b.disabled = true);
     
     if (currentQuestIndex >= activePool.length) {
         let newQuest = await callAI_GenerateQuest(currentSkill);
@@ -555,39 +674,41 @@ async function loadCurrentQuest() {
 
     const mName = document.getElementById('monster-name');
     const mAvt = document.getElementById('monster-avatar');
+    mAvt.classList.remove('monster-hit');
     mAvt.innerText = currentQuest.avatar || '👾';
     
     if (floorLevel % 10 === 0) {
-        mName.innerText = "GIÁM KHẢO AI TỐI THƯỢNG (BOSS)";
+        mName.innerText = "SUPREME AI EXAMINER (BOSS)";
         mName.style.color = "#ff4757";
         mAvt.style.transform = "scale(1.3)";
         timeLeft = 60;
     } else {
-        mName.innerText = currentQuest.monster || 'Thủ Hộ Hầm Ngục';
+        mName.innerText = currentQuest.monster || 'Abyssal Guardian';
         mName.style.color = "var(--gold)";
         mAvt.style.transform = "scale(1)";
     }
 
-    document.getElementById('monster-meta').innerText = `Tầng ${floorLevel} • Vực Sâu Hỗn Mang`;
+    document.getElementById('monster-meta').innerText = `Floor ${floorLevel} • Band ${currentQuest.band || BAND_THRESHOLDS[currentBandIndex].band}`;
     document.getElementById('quest-badge').innerText = (currentQuest.type || 'QUEST').replace(/_/g, ' ');
 
     const ctxContainer = document.getElementById('quest-context-container');
     if (currentQuest.skill === 'listening') {
-        ctxContainer.innerHTML = `<div class="passage-text" style="font-style: italic; color: #8a99ad; text-align: center;">🔒 (Listening: Script ẩn. Bật Audio để nghe)</div>`;
+        ctxContainer.innerHTML = `<div class="passage-text" style="font-style: italic; color: #8a99ad; text-align: center;">🔒 (Listening: Script hidden. Play Audio to listen)</div>`;
     } else if (currentQuest.context) {
         ctxContainer.innerHTML = `<div class="passage-text">${currentQuest.context}</div>`;
     } else {
         ctxContainer.innerHTML = '';
     }
 
-    document.getElementById('quest-prompt').innerHTML = `<b>Nhiệm vụ:</b> ${currentQuest.prompt}`;
+    // Render prompt with highlighted blank slot
+    document.getElementById('quest-prompt').innerHTML = `<b>Task:</b> ${formatPromptWithBlanks(currentQuest.prompt)}`;
     
     document.querySelectorAll('.hub-btn').forEach(b => b.disabled = false);
     renderInputForQuest(currentQuest);
 
     updateTimerUI();
     startTimer();
-    log(`⚔️ Tầng ${floorLevel}: ${currentQuest.monster} xuất hiện!`);
+    log(`⚔️ Floor ${floorLevel}: ${currentQuest.monster} appeared!`);
 }
 
 function renderInputForQuest(q) {
@@ -604,40 +725,40 @@ function renderInputForQuest(q) {
             <label class="option-item"><input type="radio" name="user_choice" value="${opt}"> ${opt}</label>
         `).join('');
         actionsContainer.innerHTML = `
-            <button class="game-btn btn-submit" onclick="checkAnswerAsync()">TẤN CÔNG (SUBMIT)</button>
-            ${q.skill === 'listening' ? '<button class="game-btn btn-audio" onclick="playAudioWhisper()">🔊 AUDIO</button>' : '<button class="game-btn btn-hint" onclick="sacrificeHPHint()">GỢI Ý (-15 HP)</button>'}
+            <button class="game-btn btn-submit" onclick="checkAnswerAsync()">ATTACK (SUBMIT)</button>
+            ${q.skill === 'listening' ? '<button class="game-btn btn-audio" id="btn-audio-player" onclick="playAudioWhisper()">🔊 AUDIO</button>' : '<button class="game-btn btn-hint" onclick="sacrificeHPHint()">HINT (-15 HP)</button>'}
         `;
     }
     else if (q.type === 'SHORT_ANSWER') {
-        inputContainer.innerHTML = `<input type="text" id="text-answer-input" class="quest-input" placeholder="Nhập đáp án (Nhấn Enter để nộp)..." onkeydown="if(event.key==='Enter') checkAnswerAsync()">`;
+        inputContainer.innerHTML = `<input type="text" id="text-answer-input" class="quest-input" placeholder="Enter your answer (Press Enter to submit)..." onkeydown="if(event.key==='Enter') checkAnswerAsync()">`;
         actionsContainer.innerHTML = `
-            <button class="game-btn btn-submit" onclick="checkAnswerAsync()">TẤN CÔNG (SUBMIT)</button>
-            ${q.skill === 'listening' ? '<button class="game-btn btn-audio" onclick="playAudioWhisper()">🔊 AUDIO</button>' : '<button class="game-btn btn-hint" onclick="sacrificeHPHint()">GỢI Ý (-15 HP)</button>'}
+            <button class="game-btn btn-submit" onclick="checkAnswerAsync()">ATTACK (SUBMIT)</button>
+            ${q.skill === 'listening' ? '<button class="game-btn btn-audio" id="btn-audio-player" onclick="playAudioWhisper()">🔊 AUDIO</button>' : '<button class="game-btn btn-hint" onclick="sacrificeHPHint()">HINT (-15 HP)</button>'}
         `;
     }
     else if (q.type === 'REBUTTAL_WRITING') {
-        inputContainer.innerHTML = `<textarea id="text-answer-input" class="quest-input" rows="2" placeholder="Nhập câu trả lời hoàn chỉnh của bạn..."></textarea>`;
-        actionsContainer.innerHTML = `<button class="game-btn btn-submit" id="btn-write" onclick="handleWritingAsync()">TẤN CÔNG (SUBMIT)</button>`;
+        inputContainer.innerHTML = `<textarea id="text-answer-input" class="quest-input" rows="2" placeholder="Type your complete answer here..."></textarea>`;
+        actionsContainer.innerHTML = `<button class="game-btn btn-submit" id="btn-write" onclick="handleWritingAsync()">ATTACK (SUBMIT)</button>`;
     }
     else if (q.type === 'SPEAKING_PROMPT') {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         let micBtnHTML = '';
         if (!SpeechRecognition) {
-            micBtnHTML = `<button class="game-btn btn-audio" disabled style="background:#555;cursor:not-allowed;">🚫 KHÔNG HỖ TRỢ MIC (DÙNG CHROME)</button>`;
+            micBtnHTML = `<button class="game-btn btn-audio" disabled style="background:#555;cursor:not-allowed;">🚫 MIC NOT SUPPORTED (USE CHROME)</button>`;
         } else {
-            micBtnHTML = `<button class="game-btn btn-audio" id="mic-trigger-btn" onclick="toggleSpeakingRecord()">🎙️ BẤM ĐỂ NÓI</button>`;
+            micBtnHTML = `<button class="game-btn btn-audio" id="mic-trigger-btn" onclick="toggleSpeakingRecord()">🎙️ PRESS TO SPEAK</button>`;
         }
 
         inputContainer.innerHTML = `
-            <div id="speaking-status" style="font-family: var(--font-game); color: var(--gold); margin-bottom: 8px;">Trạng thái: Sẵn sàng micro...</div>
-            <div id="speech-transcript" class="passage-text" style="min-height: 50px; font-style: italic;">(Giọng nói sẽ hiển thị tại đây...)</div>
+            <div id="speaking-status" style="font-family: var(--font-game); color: var(--gold); margin-bottom: 8px;">Status: Microphone ready...</div>
+            <div id="speech-transcript" class="passage-text" style="min-height: 50px; font-style: italic;">(Spoken voice will appear here...)</div>
         `;
         actionsContainer.innerHTML = micBtnHTML;
     }
 }
 
 // ==========================================
-// CHẤM ĐÁP ÁN (ASYNC)
+// ANSWER EVALUATION (ASYNC)
 // ==========================================
 async function checkAnswerAsync() {
     let userAns = '';
@@ -645,16 +766,16 @@ async function checkAnswerAsync() {
         const inputEl = document.getElementById('text-answer-input');
         if (!inputEl) return;
         userAns = inputEl.value.trim().toLowerCase();
-        if (!userAns) return log('⚠️ Vui lòng nhập đáp án!');
+        if (!userAns) return log('⚠️ Please enter an answer!');
     } else {
         const checked = document.querySelector('input[name="user_choice"]:checked');
-        if (!checked) return log('⚠️ Vui lòng chọn đáp án!');
+        if (!checked) return log('⚠️ Please select an option!');
         userAns = checked.value.trim().toLowerCase();
     }
 
     const correctAnsList = Array.isArray(currentQuest.answer) 
-        ? currentQuest.answer.map(a => String(a).toLowerCase()) 
-        : [String(currentQuest.answer).toLowerCase()];
+        ? currentQuest.answer.map(a => String(a).toLowerCase().trim()) 
+        : [String(currentQuest.answer).toLowerCase().trim()];
 
     const isCorrect = correctAnsList.some(validAns => {
         if (!validAns) return false;
@@ -671,19 +792,19 @@ async function checkAnswerAsync() {
     });
 
     if (isCorrect) triggerVictory();
-    else takeDamage(25, `Sai đáp án!`, currentQuest.explanation);
+    else takeDamage(25, `Wrong answer!`, currentQuest.explanation);
 }
 
 async function handleWritingAsync() {
     const text = document.getElementById('text-answer-input').value.trim();
-    if (text.length < 10) return log('⚠️ Câu quá ngắn!');
+    if (text.length < 8) return log('⚠️ Sentence is too short!');
 
     const btn = document.getElementById('btn-write');
     btn.disabled = true;
-    btn.innerText = "ĐANG GỬI CHO AI CHẤM...";
+    btn.innerText = "SUBMITTING TO AI EXAMINER...";
     clearInterval(timerInterval);
 
-    log("👁️ Giám khảo AI đang phân tích ngữ pháp và lập luận...");
+    log("👁️ AI Examiner is evaluating grammar and logic...");
     
     let result = await callAI_EvaluateWriting(text, currentQuest.context, currentQuest.prompt);
 
@@ -696,10 +817,10 @@ async function handleWritingAsync() {
             triggerVictory(result.feedback);
         }, 1200);
     } else {
-        takeDamage(result.damage || 30, 'Phản biện thất bại!', result.feedback);
+        takeDamage(result.damage || 30, 'Rebuttal Failed!', result.feedback);
         if (playerHP > 0) {
             btn.disabled = false;
-            btn.innerText = "TẤN CÔNG LẠI (SUBMIT)";
+            btn.innerText = "RETRY ATTACK (SUBMIT)";
             startTimer();
         }
     }
@@ -731,10 +852,10 @@ function toggleSpeakingRecord() {
     recognitionInstance.onstart = () => {
         isRecording = true;
         speechStartTime = Date.now();
-        micBtn.innerText = '🔴 ĐANG THU (Bấm để DỪNG)';
+        micBtn.innerText = '🔴 RECORDING (Press to STOP)';
         micBtn.style.background = 'var(--hp-red)';
         transcriptBox.innerText = '';
-        statusBox.innerText = "Trạng thái: Đang lắng nghe luồng âm thanh...";
+        statusBox.innerText = "Status: Listening to speech audio stream...";
         clearInterval(timerInterval);
     };
 
@@ -745,7 +866,7 @@ function toggleSpeakingRecord() {
     };
 
     recognitionInstance.onerror = (e) => {
-        log("⚠️ Lỗi Mic: " + e.error);
+        log("⚠️ Mic Error: " + e.error);
         resetMicUI();
         startTimer();
     };
@@ -762,7 +883,7 @@ function toggleSpeakingRecord() {
 function resetMicUI() {
     const micBtn = document.getElementById('mic-trigger-btn');
     if (micBtn) {
-        micBtn.innerText = '🎙️ BẤM ĐỂ NÓI LẠI';
+        micBtn.innerText = '🎙️ SPEAK AGAIN';
         micBtn.style.background = '#3498db';
     }
 }
@@ -775,63 +896,120 @@ function processFluencyResult(transcript) {
     let wordCount = words.length;
     let wpm = Math.round((wordCount / durationSeconds) * 60);
 
-    document.getElementById('speaking-status').innerText = `Kết quả: ${wordCount} từ | ${durationSeconds.toFixed(1)}s | Tốc độ: ${wpm} WPM`;
+    document.getElementById('speaking-status').innerText = `Result: ${wordCount} words | ${durationSeconds.toFixed(1)}s | Speed: ${wpm} WPM`;
 
-    if (wordCount > 10 && wpm > 90) {
-        triggerVictory(`Đỉnh cao Fluency! Tốc độ của bạn đạt ${wpm} WPM.`);
-    } else if (wordCount <= 10) {
-        takeDamage(20, `Quá ngắn (${wordCount} từ).`, "Cần khai triển ý dài hơn để giám khảo đánh giá.");
+    if (wordCount >= 8 && wpm >= 85) {
+        triggerVictory(`Fluency Mastery! Speech pace reached ${wpm} WPM.`);
+    } else if (wordCount < 8) {
+        takeDamage(20, `Too brief (${wordCount} words).`, "Expand your response to provide sufficient sample.");
         if (playerHP > 0) startTimer();
     } else {
-        takeDamage(25, `Ngập ngừng quá nhiều (WPM: ${wpm}).`, "Tốc độ tiêu chuẩn IELTS cần > 90 WPM. Hãy luyện nối âm.");
+        takeDamage(25, `Pacing hesitant (WPM: ${wpm}).`, "Target IELTS fluency speed is > 85 WPM.");
         if (playerHP > 0) startTimer();
     }
 }
 
 // ==========================================
-// CORE SYSTEM HELPERS
+// CORE SYSTEM HELPERS & AUDIO
 // ==========================================
 function playAudioWhisper() {
-    if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-        const utter = new SpeechSynthesisUtterance(currentQuest.context || currentQuest.prompt);
-        utter.rate = 0.9; utter.pitch = 0.85; utter.lang = 'en-US';
-        window.speechSynthesis.speak(utter);
-    } else log('⚠️ Trình duyệt không hỗ trợ Audio.');
+    if (!('speechSynthesis' in window)) {
+        return log('⚠️ Browser does not support Audio synthesis.');
+    }
+
+    const audioBtn = document.getElementById('btn-audio-player');
+    if (audioBtn) audioBtn.innerText = '🔊 PLAYING...';
+
+    window.speechSynthesis.cancel();
+    const textToSpeak = currentQuest.context || currentQuest.prompt;
+    const utter = new SpeechSynthesisUtterance(textToSpeak);
+    utter.rate = 0.92;
+    utter.pitch = 0.95;
+    utter.lang = 'en-US';
+
+    // Pick natural English voice if available
+    const voices = window.speechSynthesis.getVoices();
+    const enVoice = voices.find(v => v.lang.startsWith('en') && (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Samantha') || v.name.includes('US')));
+    if (enVoice) utter.voice = enVoice;
+
+    utter.onend = () => {
+        if (audioBtn) audioBtn.innerText = '🔊 AUDIO';
+    };
+    utter.onerror = () => {
+        if (audioBtn) audioBtn.innerText = '🔊 AUDIO';
+    };
+
+    window.speechSynthesis.speak(utter);
+}
+
+function triggerMonsterHitAnimation() {
+    const avatar = document.getElementById('monster-avatar');
+    const box = document.getElementById('monster-view-box');
+    if (!avatar || !box) return;
+
+    avatar.classList.remove('monster-hit');
+    void avatar.offsetWidth; // Trigger reflow
+    avatar.classList.add('monster-hit');
+
+    // Spawn floating damage text
+    const critEl = document.createElement('div');
+    critEl.className = 'crit-text';
+    critEl.innerText = '⚔️ HIT!';
+    box.appendChild(critEl);
+    setTimeout(() => { critEl.remove(); }, 800);
+}
+
+function triggerScreenShake() {
+    const container = document.getElementById('game-container');
+    if (!container) return;
+    container.classList.remove('screen-shake');
+    void container.offsetWidth;
+    container.classList.add('screen-shake');
+    setTimeout(() => { container.classList.remove('screen-shake'); }, 400);
 }
 
 function sacrificeHPHint() {
-    if (playerHP <= 15) return log('⚠️ Máu quá thấp (<= 15 HP), không thể hiến máu!');
-    takeDamage(15, 'Đã hiến 15 HP đổi Gợi Ý!', `💡 GỢI Ý: ${currentQuest.hint || 'Hãy đọc kỹ từ khóa trong câu hỏi.'}`);
+    if (playerHP <= 15) return log('⚠️ HP too low (<= 15 HP), cannot sacrifice HP!');
+    takeDamage(15, 'Sacrificed 15 HP for a Hint!', `💡 HINT: ${currentQuest.hint || 'Carefully check keywords in the question.'}`);
 }
 
 function takeDamage(amt, reason, explanation = null) {
     playerHP = Math.max(0, playerHP - amt);
     updateHPBar();
+    triggerScreenShake();
     
     let msg = `💥 ${reason}`;
-    if (explanation) msg += ` | Sư phạm: ${explanation}`;
+    if (explanation) msg += ` | Key insight: ${explanation}`;
     log(msg);
 
     if (playerHP <= 0) {
         clearInterval(timerInterval);
         if (isRecording && recognitionInstance) recognitionInstance.stop();
-        setTimeout(() => { document.getElementById('game-over-overlay').style.display = 'flex'; }, 500);
+        setTimeout(() => { 
+            const overlay = document.getElementById('game-over-overlay');
+            const restartBtn = document.getElementById('btn-restart');
+            if (restartBtn) restartBtn.disabled = false;
+            overlay.style.display = 'flex'; 
+        }, 500);
     }
 }
 
 function triggerVictory(customMsg) {
     clearInterval(timerInterval);
-    gainEXP(30); 
+    triggerMonsterHitAnimation();
+    
+    // Gradual EXP gain: +15 EXP normally, +25 on boss floors
+    const expGain = floorLevel % 10 === 0 ? 25 : 15;
+    gainEXP(expGain); 
 
-    let msg = customMsg || 'Kẻ thù đã bị thanh tẩy!';
+    let msg = customMsg || 'Enemy was vanquished!';
     if (floorLevel % 5 === 0) {
         const loot = LOOT_POOL[Math.floor(Math.random() * LOOT_POOL.length)];
-        msg += ` 🎁 Nhặt được: ${loot}!`;
+        msg += ` 🎁 Loot Discovered: ${loot}!`;
     }
 
-    log(`🎉 CHIẾN THẮNG: ${msg}`);
-    document.getElementById('quest-actions').innerHTML = `<button class="game-btn btn-next" onclick="nextQuestAsync()">TIẾN LÊN TẦNG TIẾP THEO ➔</button>`;
+    log(`🎉 VICTORY: ${msg}`);
+    document.getElementById('quest-actions').innerHTML = `<button class="game-btn btn-next" onclick="nextQuestAsync()">NEXT FLOOR ➔</button>`;
 }
 
 async function nextQuestAsync() {
@@ -854,7 +1032,7 @@ function startTimer() {
         updateTimerUI();
         if (timeLeft <= 0) {
             clearInterval(timerInterval);
-            takeDamage(30, 'HẾT GIỜ! Quái vật đánh đòn sấm sét!');
+            takeDamage(30, 'TIME OUT! The monster strikes with thunder!');
             if (playerHP > 0) nextQuestAsync();
         }
     }, 1000);
@@ -869,12 +1047,21 @@ function restartGame() {
     playerEXP = 0;
     currentBandIndex = 0;
     floorLevel = 0;
+    activePool = [];
+    currentQuestIndex = 0;
     updateBandUI();
     updateHPBar();
     selectSkill(currentSkill);
 }
 
-// Khởi chạy game lần đầu
+// Initial voices load for TTS
+if ('speechSynthesis' in window) {
+    window.speechSynthesis.onvoiceschanged = () => {
+        window.speechSynthesis.getVoices();
+    };
+}
+
+// Launch Game
 updateBandUI();
 selectSkill('reading');
 </script>
